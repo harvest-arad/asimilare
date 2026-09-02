@@ -223,6 +223,9 @@
     letter-spacing: 0.03em; color: var(--ink); cursor: pointer;
   }
 
+  /* Un link care arată ca buton — WhatsApp trebuie să fie ancoră, nu buton. */
+  a.btn { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+
   .btn-primary { background: var(--gold); border-color: var(--gold); color: var(--on-gold); }
   .btn-danger { color: var(--gap); border-color: var(--gap); background: var(--gap-bg); }
   .btn[disabled] { opacity: 0.45; cursor: default; }
@@ -246,6 +249,20 @@
   }
 
   .field input:focus-visible, .field select:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+
+  /* Comutatorul de coordonator. Rândul întreg e ținta de atins, nu pătrățelul. */
+  .comutator {
+    display: flex; align-items: center; gap: 0.75rem; cursor: pointer;
+    margin: 0 0 0.7rem; padding: 0.7rem 0.8rem; border-radius: 0.45rem;
+    border: 1px solid var(--line); background: var(--ground);
+  }
+
+  .comutator input { width: 1.35rem; height: 1.35rem; flex: none; accent-color: var(--gold); margin: 0; }
+  .comutator b { font-weight: 600; font-size: 0.95rem; }
+  .comutator small { display: block; color: var(--ink-mute); font-size: 0.72rem; line-height: 1.45; }
+  .comutator:has(input:checked) { border-color: var(--gold); }
+  .comutator:has(input:disabled) { opacity: 0.65; cursor: default; }
+  .comutator:has(input:focus-visible) { outline: 3px solid var(--gold); outline-offset: 1px; }
 
   .scrim { position: fixed; inset: 0; z-index: 50; background: var(--scrim); display: flex; align-items: flex-end; justify-content: center; }
 
@@ -950,10 +967,37 @@
 
     h += '<p class="footnote">Pauza e pentru situații temporare. Omul rămâne în echipă, ' +
          'dar nu primește remindere până îl reactivezi.<br><br>' +
-         '<b>Al doilea coordonator:</b> scrie „coordonator" în câmpul Rol al persoanei. ' +
-         'Din acel moment linkul ei de coordonator funcționează și vede tot ce vezi tu. ' +
-         'Îi retragi accesul ștergând cuvântul din Rol.</p>';
+         '<b>Al doilea coordonator:</b> deschide-i cartela și pornește ' +
+         '„Poate vedea toată echipa". Îi apare acolo linkul lui, cu buton de copiat ' +
+         'și de trimis pe WhatsApp. Îi retragi accesul stingând același comutator.</p>';
     host.innerHTML = h;
+  }
+
+  /**
+   * „Coordonator" în câmpul Rol e ce dă accesul — comutatorul doar pune și
+   * scoate cuvântul, fără să atingă restul. „Coordonator adjunct" rămâne
+   * „adjunct" când îl stingi, ca să nu se piardă informația.
+   */
+  function rolCu(rol, coord) {
+    var r = String(rol || '').replace(/coordonator/ig, '')
+      .replace(/\s+/g, ' ').replace(/^[\s·,;\-–—]+|[\s·,;\-–—]+$/g, '').trim();
+    if (!coord) return r;
+    return r ? 'Coordonator · ' + r : 'Coordonator';
+  }
+
+  /** Copiază un text și spune ce s-a întâmplat. Fără clipboard, arată linkul. */
+  function copiaza(text, reusit) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(
+        function () { toast(reusit || 'Copiat'); },
+        function () { promptCopiere(text); });
+      return;
+    }
+    promptCopiere(text);
+  }
+
+  function promptCopiere(text) {
+    window.prompt('Copiază linkul de aici:', text);
   }
 
   function fisaMembru(id) {
@@ -965,11 +1009,37 @@
           '<a class="contact" href="https://wa.me/' + tel + '" target="_blank" rel="noopener"><b>WhatsApp</b><span>conversație</span></a>'
         : '') +
       (m.email ? '<a class="contact" href="mailto:' + esc(m.email) + '"><b>' + esc(m.email) + '</b><span>email</span></a>' : '') +
-      '<div class="contact"><b>Linkul lui</b><span>' + esc(m.link.slice(-14)) + '</span></div>' +
-      (m.linkAdmin
-        ? '<div class="contact" style="border-color:var(--gold)"><b>Vede toată echipa</b>' +
-          '<span>are acces de coordonator</span></div>'
-        : '');
+      '<div class="contact"><b>Linkul lui</b><span>' + esc(m.link.slice(-14)) + '</span></div>';
+
+    // Linkul de coordonator, gata de dat mai departe. Apare doar dacă omul chiar
+    // are acces acum — altfel ar circula un link care nu deschide nimic.
+    var linkCoord = m.linkAdmin
+      ? '<div class="contact" style="border-color:var(--gold)"><b>Linkul lui de coordonator</b>' +
+        '<span>…' + esc(m.linkAdmin.slice(-12)) + '</span></div>' +
+        '<div class="bulk"><button class="btn" data-copiaza="1">Copiază linkul</button>' +
+        (m.telefon
+          ? '<a class="btn" target="_blank" rel="noopener" href="https://wa.me/' + tel +
+            '?text=' + encodeURIComponent(
+              'Salut! Ăsta e linkul tău de coordonator pentru echipa ' + D.echipa.nume +
+              '. Deschide-l o dată de pe telefonul tău — de atunci rămâne legat de el ' +
+              'și nu mai merge de pe altul.' + NL + NL + m.linkAdmin) +
+            '">Trimite pe WhatsApp</a>'
+          : '') +
+        '</div>'
+      : '';
+
+    // Pe propria cartelă comutatorul e blocat: altfel te-ai putea încuia singur
+    // pe dinafară, cu un singur atins, fără drum înapoi din aplicație.
+    var euSunt = String(m.id) === String(D.vizitatorId);
+    var comutator =
+      '<label class="comutator"><input type="checkbox" id="fCoord"' +
+      (m.linkAdmin ? ' checked' : '') + (euSunt ? ' disabled' : '') + '>' +
+      '<span><b>Poate vedea toată echipa</b><small>' +
+      (euSunt
+        ? 'Ăsta ești tu. Accesul tău se schimbă doar din foaie.'
+        : 'Vede tot ce vezi tu la echipa asta și poate trimite remindere. ' +
+          'Primește un link propriu, care se leagă de telefonul lui.') +
+      '</small></span></label>';
 
     var actiuni = m.stare === 'activ'
       ? '<label class="field"><span>Motivul pauzei (opțional)</span><input id="fPauza" placeholder="ex. concediu până în octombrie"></label>' +
@@ -989,7 +1059,9 @@
       '<label class="field"><span>Departament</span><select id="fD">' +
         DEPTS().map(function (d) { return '<option' + (d === m.departament ? ' selected' : '') + '>' + esc(d) + '</option>'; }).join('') +
       '</select></label>' +
-      '<label class="field"><span>Post / detaliu</span><input id="fR" value="' + esc(m.rol) + '"></label>' +
+      '<label class="field"><span>Post / detaliu</span><input id="fR" value="' +
+        esc(rolCu(m.rol, false)) + '" placeholder="ex. sunet, primire"></label>' +
+      comutator + linkCoord +
       '<label class="field"><span>Familie</span><input id="fF" value="' + esc(m.familie) + '" placeholder="ex. Ciba — aceeași etichetă la toți din familie"></label>' +
       '<label class="field"><span>Stă până la</span><select id="fP">' +
         ['12:00', '13:30'].map(function (o) { return '<option' + (o === String(m.panaLa) ? ' selected' : '') + '>' + o + '</option>'; }).join('') +
@@ -997,6 +1069,10 @@
       '<div class="bulk"><button class="btn btn-primary" data-act="salveaza">Salvează</button></div>' + actiuni +
       '</div>',
       function (ev) {
+        if (ev.target.closest('[data-copiaza]')) {
+          copiaza(m.linkAdmin, 'Copiat — trimite-i-l lui ' + m.prenume);
+          return;
+        }
         var b = ev.target.closest('[data-act]');
         if (!b) return;
         var k = b.getAttribute('data-act');
@@ -1012,7 +1088,8 @@
           date.telefon = document.getElementById('fT').value.trim();
           date.email = document.getElementById('fE').value.trim();
           date.departament = document.getElementById('fD').value;
-          date.rol = document.getElementById('fR').value.trim();
+          var vreaCoord = document.getElementById('fCoord').checked;
+          date.rol = rolCu(document.getElementById('fR').value.trim(), vreaCoord);
           date.familie = document.getElementById('fF').value.trim();
           date.panaLa = document.getElementById('fP').value;
         } else if (k === 'pauza') {
@@ -1030,9 +1107,18 @@
           date.stare = 'fost';
         }
 
+        // Dacă tocmai l-ai făcut coordonator, redeschidem cartela: linkul lui
+        // e lucrul pentru care ai apăsat, n-are rost să-l cauți din nou.
+        var tocmaiPromovat = k === 'salveaza' && !m.linkAdmin &&
+          date.rol.toLowerCase().indexOf('coordonator') >= 0 && date.stare === 'activ';
+
         b.disabled = true;
         google.script.run
-          .withSuccessHandler(function (nou) { aplica(nou); inchide(); randeaza(); toast('Salvat'); })
+          .withSuccessHandler(function (nou) {
+            aplica(nou); inchide(); randeaza();
+            if (tocmaiPromovat) { fisaMembru(m.id); toast('Are acces — trimite-i linkul'); }
+            else { toast('Salvat'); }
+          })
           .withFailureHandler(function () { toast('Nu s-a putut salva'); b.disabled = false; })
           .salveazaMembru(date, D.data, D.echipa.id);
       });
