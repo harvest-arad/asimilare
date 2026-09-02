@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Asimilare</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#16171c">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Asimilare">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&family=Open+Sans:wght@400;600;700&display=swap">
+<style>
+  :root {
+    --ground:      #f1f1f1;
+    --surface:     #ffffff;
+    --surface-sub: #e3e5ea;
+    --ink:         #2a2c32;
+    --ink-soft:    #5e626c;
+    --ink-mute:    #8b8f99;
+    --line:        #dfe2e7;
+    --band:        #2a2c32;
+    --gold:        #f5ba00;
+    --on-gold:     #16171c;
+    --yes:         #1e7a4a;  --yes-bg:     #e4f0ea;
+    --gap:         #b3452c;  --gap-bg:     #f7e7e2;
+    --covered:     #3d6382;  --covered-bg: #e5edf3;
+    --wait:        #5e626c;  --wait-bg:    #e3e5ea;
+    --scrim:       rgba(22,23,28,.45);
+    --font-display: "Montserrat", "Segoe UI", sans-serif;
+    --font-ui: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --radius: 0.6rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:      #16171c;
+      --surface:     #1e2026;
+      --surface-sub: #2a2c32;
+      --ink:         #f1f1f1;
+      --ink-soft:    #b4b7b9;
+      --ink-mute:    #8b8f99;
+      --line:        #343740;
+      --band:        #101116;
+      --yes:         #4fbf87;  --yes-bg:     #172e24;
+      --gap:         #e08a72;  --gap-bg:     #331f1b;
+      --covered:     #8fb4d0;  --covered-bg: #1b2732;
+      --wait:        #b4b7b9;  --wait-bg:    #2a2c32;
+      --scrim:       rgba(0,0,0,.65);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--font-ui); font-size: 16px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .shell { max-width: 34rem; margin: 0 auto; padding: 0 0 4rem; }
+
+  .testbar {
+    background: var(--gold); color: var(--on-gold);
+    font-family: var(--font-display); font-weight: 800;
+    font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase;
+    text-align: center; padding: 0.5rem 1rem;
+  }
+
+  .masthead { position: sticky; top: 0; z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line); }
+
+  .band { background: var(--band); border-bottom: 3px solid var(--gold); }
+
+  .band-inner {
+    max-width: 34rem; margin: 0 auto;
+    padding: 0.75rem 1.1rem 0.7rem;
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  }
+
+  .band svg { display: block; width: 6.4rem; height: auto; color: #ffffff; flex: 0 0 auto; }
+
+  .band-echipa {
+    font-family: var(--font-display); font-weight: 700;
+    font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--gold); text-align: right; line-height: 1.4;
+  }
+
+  .masthead-inner { max-width: 34rem; margin: 0 auto; padding: 0.85rem 1.1rem 0; }
+
+  .dayline {
+    appearance: none; display: inline-flex; align-items: center; gap: 0.4rem;
+    background: none; border: none; padding: 0; margin: 0 0 0.15rem;
+    font-family: var(--font-display); font-weight: 700;
+    font-size: 0.68rem; letter-spacing: 0.11em; text-transform: uppercase;
+    color: var(--ink-mute); cursor: pointer;
+  }
+
+  .dayline::after {
+    content: "schimbă"; font-size: 0.58rem; letter-spacing: 0.08em;
+    color: var(--on-gold); background: var(--gold);
+    padding: 0.1rem 0.3rem; border-radius: 0.25rem;
+  }
+
+  .title {
+    font-family: var(--font-display); font-weight: 800; letter-spacing: -0.015em;
+    font-size: 1.32rem; line-height: 1.15; margin: 0 0 0.7rem;
+  }
+
+  .progress { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--surface-sub); margin-bottom: 0.75rem; }
+  .progress i { display: block; height: 100%; }
+  .progress i[data-k="yes"] { background: var(--yes); }
+  .progress i[data-k="covered"] { background: var(--covered); }
+  .progress i[data-k="gap"] { background: var(--gap); }
+
+  .tabs { display: flex; gap: 1.2rem; border-top: 1px solid var(--line); padding-top: 0.1rem; overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+
+  .tab {
+    appearance: none; background: none; border: none; white-space: nowrap;
+    border-bottom: 3px solid transparent; padding: 0.6rem 0;
+    font-family: var(--font-display); font-size: 0.78rem; font-weight: 700;
+    letter-spacing: 0.04em; color: var(--ink-mute); cursor: pointer;
+  }
+
+  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--gold); }
+  .tab:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+  .panel { padding: 1rem 1.1rem 0; }
+  .lede { font-size: 0.86rem; color: var(--ink-soft); margin: 0 0 1rem; }
+
+  .stat-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.45rem; margin: 0 0 1.2rem; }
+
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 0.6rem 0.5rem; }
+
+  .stat-num {
+    font-family: var(--font-display); font-size: 1.4rem; font-weight: 800;
+    line-height: 1.05; font-variant-numeric: tabular-nums;
+  }
+
+  .stat-lbl {
+    font-family: var(--font-display); font-size: 0.58rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-mute); margin-top: 0.25rem;
+  }
+
+  .stat[data-k="yes"] .stat-num { color: var(--yes); }
+  .stat[data-k="covered"] .stat-num { color: var(--covered); }
+  .stat[data-k="gap"] .stat-num { color: var(--gap); }
+  .stat[data-k="wait"] .stat-num { color: var(--ink-soft); }
+
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; margin: 1.4rem 0 0.45rem; }
+
+  .section-title {
+    font-family: var(--font-display); font-size: 0.66rem; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-mute); margin: 0;
+  }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .card[data-tone="gap"] { border-color: var(--gap); border-width: 2px; }
+  .card ul { list-style: none; margin: 0; padding: 0; }
+
+  .prow { display: flex; align-items: center; gap: 0.7rem; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--line); }
+  .card li:last-child .prow, .card li:last-child .prow-btn { border-bottom: none; }
+
+  .prow-btn {
+    display: flex; align-items: center; gap: 0.7rem; width: 100%; min-height: 3.1rem;
+    padding: 0.6rem 0.85rem; border: none; border-bottom: 1px solid var(--line);
+    background: none; font-family: inherit; font-size: 1rem; color: var(--ink);
+    text-align: left; cursor: pointer;
+  }
+
+  .prow-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: -3px; }
+
+  .pbody { flex: 1 1 auto; min-width: 0; }
+  .pname { display: block; font-weight: 600; line-height: 1.3; }
+  .pnote { display: block; font-size: 0.73rem; color: var(--ink-mute); margin-top: 0.05rem; }
+
+  .chip {
+    flex: 0 0 auto; font-family: var(--font-display);
+    font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 0.25rem 0.5rem; border-radius: 0.3rem; border: 1px solid transparent;
+  }
+
+  .chip[data-k="yes"]     { color: var(--yes);     background: var(--yes-bg); }
+  .chip[data-k="covered"] { color: var(--covered); background: var(--covered-bg); }
+  .chip[data-k="gap"]     { color: var(--gap);     background: var(--gap-bg); }
+  .chip[data-k="wait"]    { color: var(--wait);    background: var(--wait-bg); }
+  .chip[data-k="due"]     { color: var(--on-gold); background: var(--gold); }
+  .chip[data-k="pauza"]   { color: var(--wait);    background: var(--wait-bg); }
+  .chip[data-k="none"]    { color: var(--ink-mute); background: none; border-color: var(--line); }
+
+  .send {
+    appearance: none; flex: 0 0 auto; min-height: 2.2rem; padding: 0 0.75rem;
+    border-radius: 0.35rem; border: 1px solid var(--line); background: var(--surface);
+    font-family: var(--font-display); font-size: 0.7rem; font-weight: 700;
+    letter-spacing: 0.04em; color: var(--ink); cursor: pointer; white-space: nowrap;
+  }
+
+  .send[data-primary="true"] { background: var(--gold); border-color: var(--gold); color: var(--on-gold); }
+
+  .mark {
+    flex: 0 0 auto; width: 1.6rem; height: 1.6rem; border-radius: 50%;
+    border: 2px solid var(--yes); background: var(--yes);
+    display: grid; place-items: center; color: var(--surface);
+  }
+
+  @media (prefers-color-scheme: dark) { .mark { color: #16171c; } }
+
+  .mark svg { width: 0.95rem; height: 0.95rem; display: block; }
+  .prow-btn[data-absent="true"] { background: var(--gap-bg); }
+  .prow-btn[data-absent="true"] .mark { border-color: var(--gap); background: transparent; color: var(--gap); }
+  .prow-btn[data-absent="true"] .pname { color: var(--ink-soft); text-decoration: line-through; text-decoration-color: var(--gap); }
+
+  .bulk { display: flex; gap: 0.5rem; margin: 0.9rem 0 0; }
+
+  .btn {
+    appearance: none; flex: 1 1 0; min-height: 2.9rem; border-radius: var(--radius);
+    border: 1px solid var(--line); background: var(--surface);
+    font-family: var(--font-display); font-size: 0.8rem; font-weight: 700;
+    letter-spacing: 0.03em; color: var(--ink); cursor: pointer;
+  }
+
+  .btn-primary { background: var(--gold); border-color: var(--gold); color: var(--on-gold); }
+  .btn-danger { color: var(--gap); border-color: var(--gap); background: var(--gap-bg); }
+  .btn[disabled] { opacity: 0.45; cursor: default; }
+  .btn:focus-visible, .send:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+  .empty { padding: 1.2rem; text-align: center; color: var(--ink-soft); font-size: 0.85rem; margin: 0; }
+  .footnote { font-size: 0.73rem; color: var(--ink-mute); margin: 1.3rem 0 0; padding-bottom: 1.2rem; line-height: 1.6; }
+
+  .field { display: block; margin: 0 0 0.7rem; }
+
+  .field > span {
+    display: block; font-family: var(--font-display); font-weight: 700;
+    font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-mute); margin-bottom: 0.3rem;
+  }
+
+  .field input, .field select {
+    width: 100%; min-height: 2.8rem; border-radius: 0.45rem;
+    border: 1px solid var(--line); background: var(--ground);
+    font-family: inherit; font-size: 0.95rem; color: var(--ink); padding: 0.4rem 0.65rem;
+  }
+
+  .field input:focus-visible, .field select:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+
+  .scrim { position: fixed; inset: 0; z-index: 50; background: var(--scrim); display: flex; align-items: flex-end; justify-content: center; }
+
+  .sheet {
+    background: var(--surface); width: 100%; max-width: 34rem; max-height: 88vh; overflow-y: auto;
+    border-radius: 0.9rem 0.9rem 0 0; border-top: 3px solid var(--gold); padding-bottom: 1.2rem;
+  }
+
+  .sheet-head { padding: 1rem 1.1rem 0.6rem; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
+  .sheet-head h2 { font-family: var(--font-display); font-size: 1.05rem; font-weight: 800; margin: 0; }
+  .sheet-head p { margin: 0.2rem 0 0; font-size: 0.74rem; color: var(--ink-mute); }
+
+  .sheet-close {
+    appearance: none; background: none; border: none;
+    font-family: var(--font-display); font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-mute); cursor: pointer;
+  }
+
+  .sheet-body { padding: 0.9rem 1.1rem 0; }
+
+  .msg {
+    background: var(--ground); border: 1px solid var(--line); border-radius: 0.5rem;
+    padding: 0.8rem 0.9rem; font-size: 0.86rem; line-height: 1.6;
+    white-space: pre-wrap; word-break: break-word;
+  }
+
+  .contact {
+    display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.45rem;
+    padding: 0.7rem 0.8rem; border-radius: 0.45rem;
+    border: 1px solid var(--line); background: var(--ground);
+    font-size: 0.88rem; color: var(--ink); text-decoration: none;
+  }
+
+  .contact b { font-weight: 600; }
+  .contact span { color: var(--ink-mute); font-size: 0.7rem; margin-left: auto; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 1.6rem; z-index: 60;
+    transform: translateX(-50%); background: var(--ink); color: var(--ground);
+    padding: 0.6rem 1rem; border-radius: 0.4rem;
+    font-family: var(--font-display); font-size: 0.78rem; font-weight: 700;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+  }
+
+  .poarta {
+    position: fixed; inset: 0; z-index: 50;
+    background: var(--ground); display: grid; place-items: center;
+    padding: 2rem 1.5rem; text-align: center;
+  }
+
+  .poarta-cutie { max-width: 24rem; }
+
+  .poarta h1 {
+    font-family: var(--font-display); font-weight: 800; font-size: 1.35rem;
+    margin: 0 0 0.6rem; color: var(--ink);
+  }
+
+  .poarta p { margin: 0 0 1.4rem; color: var(--ink-soft); font-size: 0.95rem; }
+
+  .toast[data-show="true"] { opacity: 1; }
+
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="testbar" id="testbar" hidden>Mod test — nu se trimite nimic</div>
+
+<div class="band">
+  <div class="band-inner">
+    <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" x="0" y="0" viewBox="0 0 374.1 165.5" xml:space="preserve" role="img" aria-label="Biserica Harvest Arad"><style>.st0{fill:currentColor}</style><path class="st0" d="M159.5 46.6c0-.4.3-.8.8-.8h9.4c4.9 0 8.7 3.3 8.7 7.6 0 3.2-2.6 5.6-4.5 6.5 2.2.7 5.3 2.9 5.3 6.7 0 4.6-4 7.9-9 7.9h-10c-.5 0-.8-.4-.8-.8V46.6zm9.7 11.3c2.1 0 3.5-1.6 3.5-3.7s-1.4-3.5-3.5-3.5h-4.4v7.2h4.4zm.6 11.8c2.1 0 3.7-1.6 3.7-3.7s-2.1-3.6-4.2-3.6h-4.5v7.3h5zM190.3 46.6c0-.4.4-.8.8-.8h3.8c.4 0 .8.4.8.8v27.2c0 .4-.4.8-.8.8h-3.8c-.4 0-.8-.4-.8-.8V46.6zM206.9 70.5l1.5-2.6c.3-.6 1-.6 1.4-.3.2.1 3.5 2.6 6.2 2.6 2.1 0 3.7-1.4 3.7-3.2 0-2.1-1.8-3.5-5.2-4.9-3.9-1.6-7.7-4-7.7-8.9 0-3.7 2.7-7.9 9.3-7.9 4.2 0 7.4 2.1 8.2 2.8.4.2.5.9.2 1.4l-1.6 2.3c-.3.5-.9.8-1.4.5-.3-.2-3.5-2.3-5.7-2.3-2.3 0-3.6 1.6-3.6 2.9 0 1.9 1.5 3.3 4.9 4.6 4 1.6 8.6 4 8.6 9.3 0 4.2-3.7 8.1-9.5 8.1-5.2 0-8.2-2.4-9.1-3.2-.4-.3-.6-.5-.2-1.2zM236.3 46.6c0-.4.3-.8.8-.8h16.7c.5 0 .8.4.8.8V50c0 .4-.3.8-.8.8h-12.2v6.7h10.2c.4 0 .8.4.8.8v3.4c0 .5-.4.8-.8.8h-10.2v7.2h12.2c.5 0 .8.4.8.8v3.4c0 .4-.3.8-.8.8h-16.7c-.5 0-.8-.4-.8-.8V46.6zM265.9 46.6c0-.4.3-.8.8-.8h11.8c4.9 0 9 4 9 8.8 0 3.8-2.5 6.9-6.1 8.3l5.6 10.5c.3.5 0 1.2-.7 1.2H282c-.4 0-.6-.2-.7-.4l-5.5-10.9h-4.6v10.5c0 .4-.4.8-.8.8h-3.8c-.5 0-.8-.4-.8-.8V46.6zM278 58.9c2.2 0 4.1-1.9 4.1-4.2 0-2.2-1.9-4-4.1-4h-6.7v8.2h6.7zM298.7 46.6c0-.4.4-.8.8-.8h3.8c.4 0 .8.4.8.8v27.2c0 .4-.4.8-.8.8h-3.8c-.4 0-.8-.4-.8-.8V46.6zM329.7 45.4c4.2 0 7.2 1.3 10 3.8.4.3.4.8 0 1.2l-2.5 2.6c-.3.3-.7.3-1 0-1.7-1.5-4-2.4-6.3-2.4-5.3 0-9.2 4.4-9.2 9.6 0 5.1 4 9.5 9.2 9.5 2.5 0 4.6-.9 6.3-2.3.3-.3.8-.2 1 0l2.6 2.6c.3.3.2.8 0 1.1-2.8 2.7-6.3 4-10 4-8.2 0-14.9-6.5-14.9-14.8s6.6-14.9 14.8-14.9zM346.7 73.5l12.8-27.7c.1-.2.3-.5.7-.5h.4c.4 0 .6.2.7.5L374 73.5c.2.5-.1 1.1-.7 1.1h-3.6c-.6 0-.9-.2-1.2-.8l-2-4.4h-12.3l-2 4.4c-.2.4-.5.8-1.2.8h-3.6c-.6 0-.9-.6-.7-1.1zm17.8-8.8l-4.1-9.1h-.1l-4 9.1h8.2zM159.5 87c0-.4.4-.8.8-.8h3.8c.5 0 .8.4.8.8v10.9h13.4V87c0-.4.3-.8.8-.8h3.8c.4 0 .8.4.8.8v27.2c0 .4-.4.8-.8.8h-3.8c-.5 0-.8-.4-.8-.8v-11.4h-13.4v11.4c0 .4-.3.8-.8.8h-3.8c-.4 0-.8-.4-.8-.8V87zM192.8 113.9l12.8-27.7c.1-.2.3-.5.7-.5h.4c.4 0 .6.2.7.5l12.7 27.7c.2.5-.1 1.1-.7 1.1h-3.6c-.6 0-.9-.2-1.2-.8l-2-4.4h-12.3l-2 4.4c-.2.4-.5.8-1.2.8h-3.6c-.6 0-.9-.5-.7-1.1zm17.8-8.7l-4.1-9.1h-.1l-4 9.1h8.2zM229.2 87c0-.4.3-.8.8-.8h11.8c4.9 0 9 4 9 8.8 0 3.8-2.5 6.9-6.1 8.3l5.6 10.5c.3.5 0 1.2-.7 1.2h-4.3c-.4 0-.6-.2-.7-.4l-5.5-10.9h-4.6v10.5c0 .4-.4.8-.8.8H230c-.5 0-.8-.4-.8-.8V87zm12.1 12.3c2.2 0 4.1-1.9 4.1-4.2 0-2.2-1.9-4-4.1-4h-6.7v8.2h6.7zM258.3 87.3c-.2-.5.1-1.1.7-1.1h4.2c.4 0 .6.2.7.5l7.9 17.7h.3l7.9-17.7c.1-.2.3-.5.7-.5h4.2c.6 0 .9.5.7 1.1L272.8 115c-.1.2-.3.5-.7.5h-.4c-.4 0-.6-.2-.7-.5l-12.7-27.7zM294.7 87c0-.4.3-.8.8-.8h16.7c.5 0 .8.4.8.8v3.4c0 .4-.3.8-.8.8H300v6.7h10.2c.4 0 .8.4.8.8v3.4c0 .5-.4.8-.8.8H300v7.2h12.2c.5 0 .8.4.8.8v3.4c0 .4-.3.8-.8.8h-16.7c-.5 0-.8-.4-.8-.8V87zM322.6 111l1.5-2.6c.3-.6 1-.6 1.4-.3.2.1 3.5 2.6 6.2 2.6 2.1 0 3.7-1.4 3.7-3.2 0-2.1-1.8-3.5-5.2-4.9-3.9-1.6-7.7-4-7.7-8.9 0-3.7 2.7-7.9 9.3-7.9 4.2 0 7.4 2.1 8.2 2.8.4.2.5.9.2 1.4l-1.6 2.3c-.3.5-.9.8-1.4.5-.3-.2-3.5-2.3-5.7-2.3-2.3 0-3.6 1.6-3.6 2.9 0 1.9 1.5 3.3 4.9 4.6 4 1.6 8.6 4 8.6 9.3 0 4.2-3.7 8.1-9.5 8.1-5.2 0-8.2-2.4-9.1-3.2-.3-.4-.6-.6-.2-1.2zM355.9 91.1h-6.3c-.5 0-.8-.4-.8-.8V87c0-.4.3-.8.8-.8h18c.5 0 .8.4.8.8v3.4c0 .4-.3.8-.8.8h-6.3v23.1c0 .4-.4.8-.8.8h-3.8c-.4 0-.8-.4-.8-.8V91.1zM159.6 154.3l12.8-27.7c.1-.2.3-.5.7-.5h.4c.4 0 .6.2.7.5l12.7 27.7c.2.5-.1 1.1-.7 1.1h-3.6c-.6 0-.9-.2-1.2-.8l-2-4.4h-12.3l-2 4.4c-.2.4-.5.8-1.2.8h-3.6c-.6 0-.9-.5-.7-1.1zm17.8-8.7l-4.1-9.1h-.1l-4 9.1h8.2zM196 127.4c0-.4.3-.8.8-.8h11.8c4.9 0 9 4 9 8.8 0 3.8-2.5 6.9-6.1 8.3l5.6 10.5c.3.5 0 1.2-.7 1.2h-4.3c-.4 0-.6-.2-.7-.4l-5.5-10.9h-4.6v10.5c0 .4-.4.8-.8.8h-3.8c-.5 0-.8-.4-.8-.8v-27.2zm12.1 12.3c2.2 0 4.1-1.9 4.1-4.2 0-2.2-1.9-4-4.1-4h-6.7v8.2h6.7zM225.1 154.3l12.8-27.7c.1-.2.3-.5.7-.5h.4c.4 0 .6.2.7.5l12.7 27.7c.2.5-.1 1.1-.7 1.1h-3.6c-.6 0-.9-.2-1.2-.8l-2-4.4h-12.3l-2 4.4c-.2.4-.5.8-1.2.8h-3.6c-.6 0-1-.5-.7-1.1zm17.8-8.7l-4.1-9.1h-.1l-4 9.1h8.2zM261.5 127.4c0-.4.3-.8.7-.8h9.8c7.9 0 14.4 6.5 14.4 14.4 0 8-6.5 14.4-14.4 14.4h-9.8c-.4 0-.7-.4-.7-.8v-27.2zm10 23c5.3 0 9.3-4 9.3-9.4 0-5.3-3.9-9.4-9.3-9.4h-4.7v18.8h4.7z"/><g><path class="st0" d="M63.9 164.5v-30.9c0-.8-.8-1.3-1.5-1L.7 163.5c-1 .5-.7 2 .5 2h61.7c.5 0 1-.4 1-1"/><path class="st0" d="M63.3 90.3l-63 63.2c-.7.7.1 1.8.9 1.4l62.4-31.2c.2-.1.5-.1.7 0l62.4 31.2c.8.4 1.6-.7.9-1.4L64.5 90.3c-.4-.3-.9-.3-1.2 0"/><path class="st0" d="M63.4 46.1l-63 94.6c-.4.7.4 1.4 1 .9l62.1-62.2c.3-.3.7-.3.9 0l62.1 62.2c.6.6 1.4-.2 1-.9l-63-94.6c-.3-.4-.9-.4-1.1 0M63.9 31.9V.5c0-.5.7-.7.9-.2L127.6 126c.3.6-.5 1-.8.5L64 32.2c-.1-.1-.1-.2-.1-.3"/></g></svg>
+    <div class="band-echipa" id="bandEchipa"></div>
+  </div>
+</div>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <button class="dayline" id="dayline" type="button"></button>
+    <h1 class="title">Confirmări pentru duminică</h1>
+    <div class="progress" id="progress"></div>
+    <div class="tabs" role="tablist" id="tabs">
+      <button class="tab" data-p="send" aria-selected="true">Trimite</button>
+      <button class="tab" data-p="board" aria-selected="false">Răspunsuri</button>
+      <button class="tab" data-p="sunday" aria-selected="false">Duminică</button>
+      <button class="tab" data-p="team" aria-selected="false">Echipa</button>
+      <button class="tab" data-p="dates" aria-selected="false">Datele mele</button>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <section class="panel" data-panel="send"></section>
+  <section class="panel" data-panel="board" hidden></section>
+  <section class="panel" data-panel="sunday" hidden></section>
+  <section class="panel" data-panel="team" hidden></section>
+  <section class="panel" data-panel="dates" hidden></section>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="poarta" id="poarta" hidden>
+  <div class="poarta-cutie">
+    <h1 id="poartaTitlu">Se încarcă…</h1>
+    <p id="poartaText">Aducem datele echipei.</p>
+    <button class="btn btn-primary" id="poartaBtn" hidden>Încearcă din nou</button>
+  </div>
+</div>
+
+<script>
+  var API = 'https://script.google.com/macros/s/AKfycbwR4hgy9L7wIfbxTOqqlUJvj7kJJE6WjsGwCXK3I9rNQqr5jkaMxxS25hnsQowqxqE/exec';
+  var CHEIE = 'asimilare.token';
+
+  var D = null;
+
+  /**
+   * Tokenul, o singură dată. Vine din adresă la prima deschidere (linkul primit
+   * de la Valentin), pe urmă stă în telefon — ca aplicația instalată să se
+   * deschidă direct, fără adresă lungă. Îl scoatem din bara de adrese imediat,
+   * ca să nu rămână agățat în istoric sau într-o captură de ecran.
+   */
+  var _token = null;
+
+  function tokenul() {
+    if (_token !== null) return _token;
+    var dinAdresa = new URLSearchParams(location.search).get('a');
+    if (dinAdresa) {
+      try { localStorage.setItem(CHEIE, dinAdresa); } catch (e) { /* mod privat */ }
+      history.replaceState(null, '', location.pathname);
+      return (_token = dinAdresa);
+    }
+    // Îl ținem și în memorie, nu doar în telefon: dacă browserul refuză
+    // stocarea (mod privat, setări stricte), altfel s-ar pierde imediat după
+    // ce l-am scos din adresă, și aplicația ar cere iar linkul.
+    try { return (_token = localStorage.getItem(CHEIE) || ''); }
+    catch (e) { return (_token = ''); }
+  }
+
+  // Numele metodelor sunt cele din vechea pagină; aici doar le traducem în
+  // parametri de adresă. Interfața nu știe că s-a schimbat ceva.
+  var ARGUMENTE = {
+    stare:          function () { return {}; },
+    reincarca:      function (e, d) { return { api: 'stare', e: e, d: d }; },
+    schimba:        function (t, e, d) { return { api: 'stare', e: e, d: d }; },
+    noteazaTrimis:  function (id, d, e) { return { id: id, d: d, e: e }; },
+    noteazaVerbal:  function (id, d, e) { return { id: id, d: d, e: e }; },
+    comutaServiciu: function (id, d, e) { return { id: id, d: d, e: e }; },
+    noteazaPrezenta: function (id, prezent, d, e) {
+      return { id: id, prezent: prezent, d: d, e: e };
+    },
+    raspundePentru: function (id, r, inlocuitor, d, e) {
+      return { id: id, r: r, inlocuitor: inlocuitor, d: d, e: e };
+    },
+    salveazaMembru: function (m, d, e) { return { obiect: JSON.stringify(m), d: d, e: e }; },
+    adaugaMembru:   function (m, d, e) { return { obiect: JSON.stringify(m), d: d, e: e }; }
+  };
+
+  function cheama(metoda, argumente) {
+    var par = ARGUMENTE[metoda].apply(null, argumente) || {};
+    if (!par.api) par.api = metoda;
+    par.t = tokenul();
+    var q = Object.keys(par)
+      .filter(function (k) { return par[k] !== undefined && par[k] !== null && par[k] !== ''; })
+      .map(function (k) { return k + '=' + encodeURIComponent(par[k]); })
+      .join('&');
+    return fetch(API + '?' + q)
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.ok) throw new Error(j.eroare || 'Eroare necunoscută');
+        return j.date;
+      });
+  }
+
+  // Aceeași formă ca `google.script.run`, ca să nu se schimbe niciun apel din
+  // interfață. Fiecare citire dă un obiect nou, ca două apeluri suprapuse să
+  // nu-și fure handlerele între ele.
+  var google = { script: {} };
+  Object.defineProperty(google.script, 'run', {
+    get: function () {
+      var reusit = function () {}, esuat = function () {};
+      var r = {
+        withSuccessHandler: function (f) { reusit = f; return r; },
+        withFailureHandler: function (f) { esuat = f; return r; }
+      };
+      Object.keys(ARGUMENTE).forEach(function (metoda) {
+        r[metoda] = function () {
+          cheama(metoda, [].slice.call(arguments)).then(
+            function (d) { reusit(d); },
+            function (er) { console.warn(metoda, er); esuat(er); });
+          return r;
+        };
+      });
+      return r;
+    }
+  });
+
+  // Departamentele vin de la server, potrivite grupului din care face parte
+  // echipa: Welcome are Acces/Sală/Parcare, Cafeneaua are doar Cafenea.
+  function DEPTS() { return D.departamente || ['Nealocat']; }
+  var TICK = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>';
+  var CROSS = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M6 6l8 8M14 6l-8 8"/></svg>';
+  var sheet = null;
+
+  // Funcțiile de pe server întorc datele fără să știe cine se uită la ele,
+  // așa că păstrăm numele de la încărcarea paginii.
+  // Funcțiile de pe server întorc datele fără să știe cine se uită la ele,
+  // așa că păstrăm de la încărcarea paginii cine e vizitatorul și la ce are voie.
+  function aplica(nou) {
+    if (!nou) return;
+    ['vizitator', 'vizitatorId', 'token'].forEach(function (k) {
+      if (!nou[k]) nou[k] = D[k];
+    });
+    if (!nou.esteAdmin) nou.esteAdmin = D.esteAdmin;
+    if (!nou.echipe || nou.echipe.length < (D.echipe || []).length) nou.echipe = D.echipe;
+    D = nou;
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function toast(t) {
+    var el = document.getElementById('toast');
+    el.textContent = t;
+    el.setAttribute('data-show', 'true');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { el.setAttribute('data-show', 'false'); }, 2200);
+  }
+
+  // Cine e așteptat la data asta. La echipele care trimit un schimb dintr-un
+  // bazin mai mare (cafenea, security, medicii), doar cei puși de serviciu.
+  function activi() {
+    return D.membri.filter(function (m) { return m.stare === 'activ' && m.deServiciu; });
+  }
+
+  function totiActivii() { return D.membri.filter(function (m) { return m.stare === 'activ'; }); }
+
+  function eSchimb() { return D.echipa.model === 'schimb'; }
+
+  // „duminică, 27 septembrie" sau „joi, 9 aprilie — Joia Mare"
+  function ziuaText() {
+    return D.duminicaText + (D.eveniment ? ' — ' + D.eveniment : '');
+  }
+
+  // Coordonatorul nu-și trimite mesaj lui însuși — își notează răspunsul
+  // direct, din rândul de sus.
+  function deTrimis() {
+    return activi().filter(function (m) { return m.id !== D.vizitatorId; });
+  }
+
+  function eu() {
+    return D.vizitatorId ? byId(D.vizitatorId) : null;
+  }
+  function byId(id) { return D.membri.filter(function (m) { return m.id === id; })[0]; }
+  function zileIntre(a, b) { return (!a || !b) ? 0 : Math.round((new Date(b) - new Date(a)) / 86400000); }
+
+  function stare(m) {
+    if (m.stare !== 'activ') return 'none';
+    if (m.raspuns === 'da') return 'yes';
+    if (m.raspuns === 'nu') return m.inlocuitor ? 'covered' : 'gap';
+    if (!m.trimisLa) return 'none';
+    var deLa = zileIntre(m.ultimPing || m.trimisLa, D.azi);
+    var total = zileIntre(m.trimisLa, D.azi);
+    return (total >= D.config.ZILE_ASTEPTARE && deLa >= 1) ? 'due' : 'wait';
+  }
+
+  var ETICHETA = { yes: 'vine', covered: 'înlocuit', gap: 'gol', wait: 'așteptăm', due: 'de reamintit', none: 'netrimis' };
+
+  function prinCine(m) {
+    if (!m.via) return '';
+    if (m.via === 'verbal') return 'a anunțat verbal';
+    if (m.via.indexOf('familie:') === 0) return 'confirmat de ' + m.via.split(':')[1];
+    return '';
+  }
+
+  function numara() {
+    var c = { yes: 0, covered: 0, gap: 0, wait: 0, due: 0, none: 0 };
+    deTrimis().forEach(function (m) { c[stare(m)]++; });
+    return c;
+  }
+
+  function telIntl(t) {
+    var d = String(t).replace(/\D/g, '');
+    if (d.indexOf('0') === 0) d = '40' + d.slice(1);
+    return d;
+  }
+
+  function mesaj(m, reminder) {
+    if (reminder) {
+      return 'Salut, ' + m.prenume + '! Revin cu rugămintea să-mi confirmi pentru ' +
+        ziuaText() + '. E de ajuns o atingere:\n' + m.link + '\n\nMulțumesc! ' + D.echipa.coordonator;
+    }
+    var Z = ziuaText();
+    return 'Salut, ' + m.prenume + '! ' + Z.charAt(0).toUpperCase() + Z.slice(1) +
+      ', ești programat(ă) la ' + m.departament.toLowerCase() + (m.rol ? ' — ' + m.rol : '') + '.\n\n' +
+      'Confirmă-mi te rog dacă vii, dintr-o atingere:\n' + m.link + '\n\n' +
+      'Dacă nu poți, tot de acolo îmi spui și dacă ai găsit pe cineva să te înlocuiască. Mulțumesc! ' +
+      D.echipa.coordonator;
+  }
+
+  // ── Trimite ─────────────────────────────────────────
+
+  function randEu() {
+    var m = eu();
+    if (!m) return '';
+    var s = stare(m);
+    var raspuns = (s === 'yes' || s === 'covered' || s === 'gap');
+    var text = s === 'yes' ? 'Ai spus că vii'
+             : s === 'covered' ? 'Te înlocuiește ' + m.inlocuitor
+             : s === 'gap' ? 'Ai spus că nu poți' : '';
+
+    return '<div class="section-head"><h2 class="section-title">Tu</h2></div>' +
+      '<div class="card"><div class="prow"><span class="pbody">' +
+      '<span class="pname">' + esc(m.nume) + '</span>' +
+      '<span class="pnote">' + esc(text || (m.departament + (m.rol ? ' · ' + m.rol : ''))) + '</span></span>' +
+      (raspuns
+        ? '<button class="send" data-eu="reset">Schimbă</button>'
+        : '<button class="send" data-primary="true" data-eu="da">Vin</button>' +
+          '<button class="send" data-eu="nu">Nu pot</button>') +
+      '</div></div>';
+  }
+
+  var NL = String.fromCharCode(10);   // rând nou în mesajul de WhatsApp
+
+  function listaNume(lot) {
+    // Dacă doi au același prenume, adăugăm numele de familie. Inițiala e de
+    // ajuns când îi deosebește; dacă și ea coincide, punem numele întreg.
+    // Comparăm cu toată echipa, nu doar cu cei înșirați: dacă sunt doi Florin
+    // în echipă, „Florin" e ambiguu pentru cititor chiar dacă doar unul lipsește.
+    var peGrupe = {};
+    activi().forEach(function (m) {
+      var k = String(m.prenume || '').toLowerCase();
+      (peGrupe[k] = peGrupe[k] || []).push(m);
+    });
+
+    var etichete = lot.map(function (m) {
+      var grup = peGrupe[String(m.prenume || '').toLowerCase()];
+      if (grup.length < 2) return m.prenume;
+
+      var fam = m.numeFamilie || '';
+      if (!fam) return m.nume;
+
+      var initiala = fam.charAt(0).toUpperCase();
+      var cuAceeasiInitiala = grup.filter(function (x) {
+        return String(x.numeFamilie || '').charAt(0).toUpperCase() === initiala;
+      }).length;
+
+      return m.prenume + ' ' + (cuAceeasiInitiala > 1 ? fam : initiala + '.');
+    });
+
+    if (etichete.length === 1) return etichete[0];
+    return etichete.slice(0, -1).join(', ') + ' și ' + etichete[etichete.length - 1];
+  }
+
+  // Câți restanți mai merită înșirați pe nume. Peste atâția, lista devine un zid.
+  var MAX_NUME = 6;
+
+  function textGrup() {
+    var fara = deTrimis().filter(function (m) {
+      var s = stare(m);
+      return s === 'none' || s === 'wait' || s === 'due';
+    });
+    var total = deTrimis().length;
+    var cineva = total - fara.length;
+    var Z = ziuaText();
+
+    if (!fara.length) {
+      return 'Au confirmat toți pentru ' + Z + '. Mulțumesc!' + NL + D.echipa.coordonator;
+    }
+
+    // nimeni n-a răspuns încă, sau abia unul-doi: cererea inițială
+    if (cineva === 0) {
+      return 'Salut! ' + Z.charAt(0).toUpperCase() + Z.slice(1) +
+        ' e rândul echipei noastre. Confirmați-mi vă rog aici, durează cinci secunde:' +
+        NL + D.linkGrup + NL + NL +
+        'Dacă nu puteți, tot de acolo îmi spuneți — și dacă ați găsit pe cineva ' +
+        'să vă înlocuiască. Mulțumesc! ' + D.echipa.coordonator;
+    }
+
+    // mulți restanți: nu-i înșirăm, ar fi un perete de nume
+    if (fara.length > MAX_NUME) {
+      return 'Am primit ' + cineva + ' confirmări din ' + total + ' pentru ' + Z +
+        '. Dacă n-ai apucat încă, e o singură atingere:' +
+        NL + D.linkGrup + NL + NL + 'Mulțumesc! ' + D.echipa.coordonator;
+    }
+
+    // puțini: îi numim, e mai eficient
+    return 'Mai aștept răspuns de la ' + listaNume(fara) + ' pentru ' + Z +
+      '. E o singură atingere:' + NL + D.linkGrup + NL + NL +
+      'Mulțumesc! ' + D.echipa.coordonator;
+  }
+
+  function cardGrup() {
+    if (!D.linkGrup) return '';
+    var fara = deTrimis().filter(function (m) {
+      var s = stare(m);
+      return s === 'none' || s === 'wait' || s === 'due';
+    }).length;
+    var total = deTrimis().length;
+
+    return '<div class="section-head"><h2 class="section-title">Grupul echipei</h2>' +
+      '<span class="section-title">' + (total - fara) + '/' + total + '</span></div>' +
+      '<div class="card"><div style="padding:0.85rem">' +
+      '<div class="msg" id="textGrup">' + esc(textGrup()) + '</div>' +
+      '<div class="bulk"><button class="btn btn-primary" data-grup="copy">' +
+        (fara === total ? 'Copiază mesajul pentru grup' : 'Copiază reminderul pentru grup') +
+      '</button></div>' +
+      '<p class="footnote" style="margin-top:0.7rem;padding-bottom:0">' +
+      'Îl lipești în grupul de WhatsApp al echipei. Fiecare își atinge numele și confirmă — ' +
+      'telefonul îl ține minte pentru duminicile următoare.</p>' +
+      '</div></div>';
+  }
+
+  function renderSend() {
+    var host = document.querySelector('[data-panel="send"]');
+    // La echipele cu schimb, întâi alegi cine e de serviciu — altfel n-are cui
+    // să i se ceară confirmarea, și mesajul pentru grup n-ar avea despre cine vorbi.
+    if (eSchimb() && !activi().length) {
+      host.innerHTML = '<p class="lede">Alege întâi cine e de serviciu ' +
+        esc(ziuaText()) + '. Pe urmă apare aici mesajul pentru grup.</p>' + cardSchimb();
+      return;
+    }
+
+    var h = '<p class="lede">Pune linkul de mai jos în grupul echipei — asta e tot. ' +
+            'Restul paginii îți arată cine a răspuns și cine nu.</p>' +
+            cardSchimb() + cardGrup() + randEu();
+
+    // Cererea inițială pleacă o singură dată, în grup. Aici rămâne doar cine
+    // n-a răspuns — și, dedesubt, situația pe scurt.
+    var fara = deTrimis().filter(function (m) {
+      var s = stare(m);
+      return s === 'none' || s === 'wait' || s === 'due';
+    }).sort(function (a, b) {
+      // cei cărora le-ai scris deja individual, primii
+      return (b.trimisLa ? 1 : 0) - (a.trimisLa ? 1 : 0);
+    });
+
+    if (fara.length) {
+      h += '<div class="section-head"><h2 class="section-title">Fără răspuns</h2>' +
+           '<span class="section-title">' + fara.length + '</span></div><div class="card"><ul>';
+
+      fara.forEach(function (m) {
+        var nota = m.departament + (m.rol ? ' · ' + m.rol : '');
+        if (m.trimisLa) {
+          var z = zileIntre(m.trimisLa, D.azi);
+          nota = (z === 0 ? 'i-ai scris azi' : 'i-ai scris acum ' + z + (z === 1 ? ' zi' : ' zile')) +
+                 ' · ' + nota;
+        }
+        h += '<li><div class="prow"><span class="pbody"><span class="pname">' + esc(m.nume) + '</span>' +
+          '<span class="pnote">' + esc(nota) + '</span></span>' +
+          '<button class="send" data-one="' + m.id + '">Scrie-i</button>' +
+          '</div></li>';
+      });
+
+      h += '</ul></div>';
+
+      if (fara.length > 1) {
+        h += '<div class="bulk"><button class="btn" data-q="fara">Scrie-le pe rând celor ' +
+             fara.length + '</button></div>';
+      }
+    }
+
+    [['gap', 'Nu poate — gol'], ['covered', 'Nu poate — înlocuit'], ['yes', 'Au confirmat']]
+    .forEach(function (p) {
+      var lot = deTrimis().filter(function (m) { return stare(m) === p[0]; });
+      if (!lot.length) return;
+
+      h += '<div class="section-head"><h2 class="section-title">' + p[1] + '</h2>' +
+           '<span class="section-title">' + lot.length + '</span></div>' +
+           '<div class="card"' + (p[0] === 'gap' ? ' data-tone="gap"' : '') + '><ul>';
+
+      lot.forEach(function (m) {
+        var nota = m.departament + (m.rol ? ' · ' + m.rol : '');
+        if (p[0] === 'covered') nota = 'înlocuit de ' + m.inlocuitor;
+        var pc = prinCine(m);
+        if (pc) nota = pc + ' — ' + nota;
+
+        h += '<li><div class="prow"><span class="pbody"><span class="pname">' + esc(m.nume) + '</span>' +
+          '<span class="pnote">' + esc(nota) + '</span></span>' +
+          '<span class="chip" data-k="' + p[0] + '">' + ETICHETA[p[0]] + '</span>' +
+          '</div></li>';
+      });
+
+      h += '</ul></div>';
+    });
+
+    h += '<p class="footnote">' + (eu() ? 'Tu nu apari în liste — îți notezi răspunsul din rândul de sus. ' : '') +
+         'Cererea pleacă o singură dată, în grup. „Scrie-i" e pentru cei care tac și după reminder — ' +
+         'deschide WhatsApp cu mesajul lui personal. Cine e pe pauză nu apare deloc.</p>';
+    host.innerHTML = h;
+  }
+
+  function serie(ids, i) {
+    if (i >= ids.length) {
+      inchide();
+      toast('Gata — ' + ids.length + (ids.length === 1 ? ' mesaj' : ' mesaje'));
+      return;
+    }
+
+    var m = byId(ids[i]);
+    var txt = mesaj(m, !!m.trimisLa);
+    var buton = D.config.MOD_TEST
+      ? '<button class="btn btn-primary" data-copy="1">Copiază mesajul</button>'
+      : (m.telefon
+          ? '<a class="contact" href="https://wa.me/' + telIntl(m.telefon) + '?text=' +
+            encodeURIComponent(txt) + '" target="_blank" rel="noopener"><b>Deschide WhatsApp</b>' +
+            '<span>' + esc(m.telefon) + '</span></a>'
+          : '<div class="contact"><b>Fără telefon</b><span>completează-l în Echipa</span></div>');
+
+    deschide(
+      '<div class="sheet-head"><div><h2>' + esc(m.nume) + '</h2>' +
+      '<p>' + (i + 1) + ' din ' + ids.length + ' · ' + esc(m.departament) + '</p></div>' +
+      '<button class="sheet-close" data-close="1">Oprește</button></div>' +
+      '<div class="sheet-body">' +
+      '<div class="progress" style="margin-bottom:0.9rem"><i data-k="yes" style="width:' + (i / ids.length * 100) + '%"></i></div>' +
+      buton +
+      '<div class="msg" id="msgText">' + esc(txt) + '</div>' +
+      '<div class="bulk"><button class="btn btn-primary" data-act="next">' +
+        (i + 1 < ids.length ? 'Am trimis · următorul' : 'Am trimis · gata') + '</button></div>' +
+      '<div class="bulk"><button class="btn" data-act="skip">Sari peste</button>' +
+      '<button class="btn" data-act="verbal">Mi-a zis verbal că nu vine</button></div>' +
+      (D.config.MOD_TEST
+        ? '<p class="footnote">Mod test: nu se deschide WhatsApp. „Am trimis" doar notează în Sheet, ca să poți parcurge fluxul.</p>'
+        : '<p class="footnote">„Sari peste" îl lasă pentru mai târziu. „Mi-a zis verbal" îl scoate din trimiteri și îl trece la cei care trebuie acoperiți.</p>') +
+      '</div>',
+      function (ev) {
+        if (ev.target.closest('[data-copy]')) {
+          var t = document.getElementById('msgText').textContent;
+          if (navigator.clipboard) navigator.clipboard.writeText(t).then(function () { toast('Copiat'); });
+          return;
+        }
+        var b = ev.target.closest('[data-act]');
+        if (!b) return;
+        var k = b.getAttribute('data-act');
+        if (k === 'skip') { serie(ids, i + 1); return; }
+        b.disabled = true;
+        var fn = (k === 'verbal') ? 'noteazaVerbal' : 'noteazaTrimis';
+        google.script.run
+          .withSuccessHandler(function (nou) { aplica(nou); serie(ids, i + 1); })
+          .withFailureHandler(function () { toast('Nu s-a putut salva'); b.disabled = false; })
+          [fn](m.id, D.data, D.echipa.id);
+      });
+  }
+
+  // ── Răspunsuri ──────────────────────────────────────
+
+  function renderBoard() {
+    var host = document.querySelector('[data-panel="board"]');
+    var c = numara();
+
+    var h = '<div class="stat-strip">' +
+      '<div class="stat" data-k="yes"><div class="stat-num">' + c.yes + '</div><div class="stat-lbl">vin</div></div>' +
+      '<div class="stat" data-k="covered"><div class="stat-num">' + c.covered + '</div><div class="stat-lbl">înlocuiți</div></div>' +
+      '<div class="stat" data-k="gap"><div class="stat-num">' + c.gap + '</div><div class="stat-lbl">goluri</div></div>' +
+      '<div class="stat" data-k="wait"><div class="stat-num">' + (c.wait + c.due + c.none) + '</div><div class="stat-lbl">fără răspuns</div></div>' +
+      '</div>';
+
+    var goluri = activi().filter(function (m) { return stare(m) === 'gap'; });
+    h += '<div class="section-head"><h2 class="section-title">Goluri de acoperit</h2></div>';
+    if (!goluri.length) {
+      h += '<div class="card"><p class="empty">Niciun gol. Tot ce s-a anunțat are înlocuitor.</p></div>';
+    } else {
+      h += '<div class="card" data-tone="gap"><ul>';
+      goluri.forEach(function (m) {
+        h += '<li><div class="prow"><span class="pbody">' +
+          '<span class="pname">' + esc(m.departament) + (m.rol ? ' — ' + esc(m.rol) : '') + '</span>' +
+          '<span class="pnote">lipsește ' + esc(m.nume) + ', fără înlocuitor</span></span>' +
+          '<span class="chip" data-k="gap">gol</span></div></li>';
+      });
+      h += '</ul></div>';
+    }
+
+    DEPTS().forEach(function (dep) {
+      var lot = activi().filter(function (m) { return m.departament === dep; });
+      if (!lot.length) return;
+      var ok = lot.filter(function (m) { var s = stare(m); return s === 'yes' || s === 'covered'; }).length;
+      h += '<div class="section-head"><h2 class="section-title">' + esc(dep) + '</h2>' +
+           '<span class="section-title">' + ok + '/' + lot.length + '</span></div><div class="card"><ul>';
+      lot.forEach(function (m) {
+        var s = stare(m);
+        var nota = s === 'covered' ? 'înlocuit de ' + m.inlocuitor : (prinCine(m) || m.rol || '—');
+        h += '<li><div class="prow"><span class="pbody"><span class="pname">' + esc(m.nume) + '</span>' +
+          '<span class="pnote">' + esc(nota) + '</span></span>' +
+          '<span class="chip" data-k="' + s + '">' + ETICHETA[s] + '</span></div></li>';
+      });
+      h += '</ul></div>';
+    });
+
+    h += '<p class="footnote">Golurile sunt singurul lucru care cere acțiune: cineva a spus că nu poate și n-a găsit înlocuitor.</p>';
+    host.innerHTML = h;
+  }
+
+  // ── Duminică ────────────────────────────────────────
+
+  function renderSunday() {
+    var host = document.querySelector('[data-panel="sunday"]');
+    var asteptati = activi().filter(function (m) {
+      var s = stare(m);
+      return s === 'yes' || s === 'covered';
+    });
+    var prezenti = asteptati.filter(function (m) { return m.prezent !== false; }).length;
+
+    var h = '<p class="lede">Toți cei care au confirmat pornesc ca prezenți. Atinge doar pe cine ' +
+            'nu a venit. Cine își schimbă răspunsul duminică dimineața dispare singur din listă.</p>' +
+            '<div class="stat-strip" style="grid-template-columns:repeat(3,1fr)">' +
+            '<div class="stat" data-k="yes"><div class="stat-num">' + prezenti + '</div><div class="stat-lbl">prezenți</div></div>' +
+            '<div class="stat" data-k="gap"><div class="stat-num">' + (asteptati.length - prezenti) + '</div><div class="stat-lbl">nu au venit</div></div>' +
+            '<div class="stat"><div class="stat-num">' + asteptati.length + '</div><div class="stat-lbl">așteptați</div></div>' +
+            '</div>';
+
+    if (!asteptati.length) {
+      h += '<div class="card"><p class="empty">Nimeni n-a confirmat încă.</p></div>';
+      host.innerHTML = h;
+      return;
+    }
+
+    [['13:30', 'Rămân până la final (13:30)'], ['12:00', 'De obicei pleacă după 12:00']].forEach(function (g) {
+      var lot = asteptati.filter(function (m) { return String(m.panaLa) === g[0]; });
+      if (!lot.length) return;
+      h += '<div class="section-head"><h2 class="section-title">' + g[1] + '</h2>' +
+           '<span class="section-title">' + lot.length + '</span></div><div class="card"><ul>';
+      lot.forEach(function (m) {
+        var abs = m.prezent === false;
+        h += '<li><button class="prow-btn" data-prez="' + m.id + '" data-absent="' + abs + '">' +
+          '<span class="mark">' + (abs ? CROSS : TICK) + '</span>' +
+          '<span class="pbody"><span class="pname">' + esc(m.nume) + '</span>' +
+          '<span class="pnote">' + esc(m.rol || m.departament) +
+          (m.inlocuitor ? ' · vine ' + esc(m.inlocuitor) + ' în locul lui' : '') + '</span></span>' +
+          '<span class="chip" data-k="' + (abs ? 'gap' : 'yes') + '">' + (abs ? 'nu a venit' : 'prezent') + '</span>' +
+          '</button></li>';
+      });
+      h += '</ul></div>';
+    });
+
+    h += '<p class="footnote">Programul echipei: ' + esc(D.config.PROGRAM_ECHIPA) + '. Serviciile: ' +
+         esc(D.config.SERVICIU_1) + ' și ' + esc(D.config.SERVICIU_2) +
+         '. Orele de plecare le vezi doar tu — voluntarilor nu li se spune nimic despre ele.</p>';
+    host.innerHTML = h;
+  }
+
+  // ── Echipa ──────────────────────────────────────────
+
+  function renderTeam() {
+    var host = document.querySelector('[data-panel="team"]');
+    var h = '<p class="lede">Atinge pe cineva ca să-i vezi contactul, să-i schimbi postul, ' +
+            'să-l pui pe pauză sau să-l scoți din echipă.</p>' +
+            '<div class="bulk"><button class="btn btn-primary" data-add="1">Adaugă membru</button></div>';
+
+    DEPTS().forEach(function (dep) {
+      var lot = D.membri.filter(function (m) { return m.stare === 'activ' && m.departament === dep; });
+      if (!lot.length) return;
+      h += '<div class="section-head"><h2 class="section-title">' + esc(dep) + '</h2>' +
+           '<span class="section-title">' + lot.length + '</span></div><div class="card"><ul>';
+      lot.forEach(function (m) {
+        h += '<li><button class="prow-btn" data-m="' + m.id + '">' +
+          '<span class="pbody"><span class="pname">' + esc(m.nume) + '</span>' +
+          '<span class="pnote">' + esc(m.rol || 'post nealocat') +
+          (m.familie ? ' · fam. ' + esc(m.familie) : '') +
+          (m.telefon ? ' · ' + esc(m.telefon) : '') + '</span></span></button></li>';
+      });
+      h += '</ul></div>';
+    });
+
+    [['pauza', 'În pauză'], ['fost', 'Foști membri']].forEach(function (g) {
+      var lot = D.membri.filter(function (m) { return m.stare === g[0]; });
+      if (!lot.length) return;
+      h += '<div class="section-head"><h2 class="section-title">' + g[1] + '</h2>' +
+           '<span class="section-title">' + lot.length + '</span></div><div class="card"><ul>';
+      lot.forEach(function (m) {
+        h += '<li><button class="prow-btn" data-m="' + m.id + '">' +
+          '<span class="pbody"><span class="pname">' + esc(m.nume) + '</span>' +
+          '<span class="pnote">' + esc(g[0] === 'pauza' ? (m.motivPauza || 'fără motiv notat') : 'atinge ca să-l readuci') +
+          '</span></span><span class="chip" data-k="pauza">' + (g[0] === 'pauza' ? 'pauză' : 'fost') + '</span></button></li>';
+      });
+      h += '</ul></div>';
+    });
+
+    h += '<p class="footnote">Pauza e pentru situații temporare. Omul rămâne în echipă, ' +
+         'dar nu primește remindere până îl reactivezi.<br><br>' +
+         '<b>Al doilea coordonator:</b> scrie „coordonator" în câmpul Rol al persoanei. ' +
+         'Din acel moment linkul ei de coordonator funcționează și vede tot ce vezi tu. ' +
+         'Îi retragi accesul ștergând cuvântul din Rol.</p>';
+    host.innerHTML = h;
+  }
+
+  function fisaMembru(id) {
+    var m = byId(id);
+    var tel = telIntl(m.telefon);
+
+    var contacte = (m.telefon
+        ? '<a class="contact" href="tel:+' + tel + '"><b>' + esc(m.telefon) + '</b><span>sună</span></a>' +
+          '<a class="contact" href="https://wa.me/' + tel + '" target="_blank" rel="noopener"><b>WhatsApp</b><span>conversație</span></a>'
+        : '') +
+      (m.email ? '<a class="contact" href="mailto:' + esc(m.email) + '"><b>' + esc(m.email) + '</b><span>email</span></a>' : '') +
+      '<div class="contact"><b>Linkul lui</b><span>' + esc(m.link.slice(-14)) + '</span></div>' +
+      (m.linkAdmin
+        ? '<div class="contact" style="border-color:var(--gold)"><b>Vede toată echipa</b>' +
+          '<span>are acces de coordonator</span></div>'
+        : '');
+
+    var actiuni = m.stare === 'activ'
+      ? '<label class="field"><span>Motivul pauzei (opțional)</span><input id="fPauza" placeholder="ex. concediu până în octombrie"></label>' +
+        '<div class="bulk"><button class="btn" data-act="pauza">Pune pe pauză</button>' +
+        '<button class="btn btn-danger" data-act="scoate">Scoate din echipă</button></div>'
+      : '<div class="bulk"><button class="btn btn-primary" data-act="activ">' +
+        (m.stare === 'pauza' ? 'Reactivează' : 'Readu în echipă') + '</button></div>';
+
+    deschide(
+      '<div class="sheet-head"><div><h2>' + esc(m.nume) + '</h2>' +
+      '<p>' + esc(m.departament) + (m.rol ? ' · ' + esc(m.rol) : '') + '</p></div>' +
+      '<button class="sheet-close" data-close="1">Închide</button></div>' +
+      '<div class="sheet-body">' + contacte +
+      '<label class="field"><span>Nume</span><input id="fN" value="' + esc(m.nume) + '"></label>' +
+      '<label class="field"><span>Telefon</span><input id="fT" value="' + esc(m.telefon) + '"></label>' +
+      '<label class="field"><span>Email</span><input id="fE" value="' + esc(m.email) + '"></label>' +
+      '<label class="field"><span>Departament</span><select id="fD">' +
+        DEPTS().map(function (d) { return '<option' + (d === m.departament ? ' selected' : '') + '>' + esc(d) + '</option>'; }).join('') +
+      '</select></label>' +
+      '<label class="field"><span>Post / detaliu</span><input id="fR" value="' + esc(m.rol) + '"></label>' +
+      '<label class="field"><span>Familie</span><input id="fF" value="' + esc(m.familie) + '" placeholder="ex. Ciba — aceeași etichetă la toți din familie"></label>' +
+      '<label class="field"><span>Stă până la</span><select id="fP">' +
+        ['12:00', '13:30'].map(function (o) { return '<option' + (o === String(m.panaLa) ? ' selected' : '') + '>' + o + '</option>'; }).join('') +
+      '</select></label>' +
+      '<div class="bulk"><button class="btn btn-primary" data-act="salveaza">Salvează</button></div>' + actiuni +
+      '</div>',
+      function (ev) {
+        var b = ev.target.closest('[data-act]');
+        if (!b) return;
+        var k = b.getAttribute('data-act');
+        var date = {
+          id: m.id, nume: m.nume, telefon: m.telefon, email: m.email,
+          departament: m.departament, rol: m.rol, familie: m.familie,
+          panaLa: m.panaLa, stare: m.stare, motivPauza: m.motivPauza
+        };
+
+        if (k === 'salveaza') {
+          date.nume = document.getElementById('fN').value.trim();
+          if (!date.nume) { toast('Numele nu poate fi gol'); return; }
+          date.telefon = document.getElementById('fT').value.trim();
+          date.email = document.getElementById('fE').value.trim();
+          date.departament = document.getElementById('fD').value;
+          date.rol = document.getElementById('fR').value.trim();
+          date.familie = document.getElementById('fF').value.trim();
+          date.panaLa = document.getElementById('fP').value;
+        } else if (k === 'pauza') {
+          date.stare = 'pauza';
+          var n = document.getElementById('fPauza');
+          date.motivPauza = n ? n.value.trim() : '';
+        } else if (k === 'activ') {
+          date.stare = 'activ'; date.motivPauza = '';
+        } else if (k === 'scoate') {
+          if (b.getAttribute('data-armat') !== '1') {
+            b.setAttribute('data-armat', '1');
+            b.textContent = 'Sigur? Atinge din nou';
+            return;
+          }
+          date.stare = 'fost';
+        }
+
+        b.disabled = true;
+        google.script.run
+          .withSuccessHandler(function (nou) { aplica(nou); inchide(); randeaza(); toast('Salvat'); })
+          .withFailureHandler(function () { toast('Nu s-a putut salva'); b.disabled = false; })
+          .salveazaMembru(date, D.data, D.echipa.id);
+      });
+  }
+
+  function fisaAdaugare() {
+    deschide(
+      '<div class="sheet-head"><div><h2>Membru nou</h2><p>Doar numele e obligatoriu</p></div>' +
+      '<button class="sheet-close" data-close="1">Închide</button></div>' +
+      '<div class="sheet-body">' +
+      '<label class="field"><span>Nume</span><input id="aN" placeholder="Nume și prenume"></label>' +
+      '<label class="field"><span>Telefon</span><input id="aT" placeholder="07xx xxx xxx"></label>' +
+      '<label class="field"><span>Email</span><input id="aE"></label>' +
+      '<label class="field"><span>Departament</span><select id="aD">' +
+        DEPTS().map(function (d) { return '<option' + (d === 'Nealocat' ? ' selected' : '') + '>' + esc(d) + '</option>'; }).join('') +
+      '</select></label>' +
+      '<label class="field"><span>Post / detaliu</span><input id="aR"></label>' +
+      '<label class="field"><span>Familie (opțional)</span><input id="aF" placeholder="aceeași etichetă la toți din familie"></label>' +
+      '<div class="bulk"><button class="btn btn-primary" data-act="adauga">Adaugă în echipă</button></div></div>',
+      function (ev) {
+        var b = ev.target.closest('[data-act]');
+        if (!b) return;
+        var nume = document.getElementById('aN').value.trim();
+        if (!nume) { toast('Scrie numele'); return; }
+        b.disabled = true;
+        google.script.run
+          .withSuccessHandler(function (nou) { aplica(nou); inchide(); randeaza(); toast(nume + ' adăugat'); })
+          .withFailureHandler(function () { toast('Nu s-a putut salva'); b.disabled = false; })
+          .adaugaMembru({
+            nume: nume,
+            telefon: document.getElementById('aT').value.trim(),
+            email: document.getElementById('aE').value.trim(),
+            departament: document.getElementById('aD').value,
+            rol: document.getElementById('aR').value.trim(),
+            familie: document.getElementById('aF').value.trim()
+          }, D.data, D.echipa.id);
+      });
+  }
+
+  // ── Datele mele ─────────────────────────────────────
+
+  function renderDates() {
+    var host = document.querySelector('[data-panel="dates"]');
+    var h = D.echipa.model === 'rotatie'
+      ? '<p class="lede">Rândul echipei <b>' + esc(D.echipa.nume) + '</b>, din calendarul ' +
+        'rotației. Data pentru care se cer confirmările merge singură mai departe după ' +
+        'fiecare slujire — nu trebuie schimbată cu mâna.</p>'
+      : '<p class="lede">Echipa <b>' + esc(D.echipa.nume) + '</b> slujește în fiecare duminică, ' +
+        'plus zilele speciale marcate mai jos.</p>';
+
+    var viitoare = D.dateleMele.filter(function (x) { return !x.trecut; });
+    var trecute = D.dateleMele.filter(function (x) { return x.trecut; });
+
+    function lista(lot, titlu) {
+      if (!lot.length) return '';
+      var o = '<div class="section-head"><h2 class="section-title">' + titlu + '</h2>' +
+              '<span class="section-title">' + lot.length + '</span></div>' +
+              '<div class="card"><ul>';
+      lot.forEach(function (x) {
+        var acum = x.data === D.data;
+        var tinta = x.data === D.dataTinta;
+        o += '<li><button class="prow-btn" data-data="' + x.data + '">' +
+          '<span class="pbody"><span class="pname">' + esc(x.text) +
+          (x.eveniment ? ' — ' + esc(x.eveniment) : '') + '</span>' +
+          '<span class="pnote">' + (tinta ? 'se cer confirmările acum' :
+            acum ? 'te uiți la ea' : 'atinge ca să te uiți la ea') + '</span></span>' +
+          (acum ? '<span class="chip" data-k="yes">deschisă</span>' :
+           tinta ? '<span class="chip" data-k="wait">următoarea</span>' : '') +
+          '</button></li>';
+      });
+      return o + '</ul></div>';
+    }
+
+    h += lista(viitoare, 'Ce urmează') + lista(trecute, 'Trecute');
+
+    if (!viitoare.length) {
+      h += '<div class="card"><p class="empty">Calendarul s-a terminat. ' +
+           'Adaugă datele următoare în fila „Duminici" din foaie.</p></div>';
+    }
+
+    h += '<p class="footnote">Zilele speciale — Joia Mare, Vinerea Mare, Paștele, ' +
+         'Anul Nou, Crăciunul — consumă și ele rândul: nu se sare peste ele.' +
+         (D.echipa.model === 'rotatie'
+           ? ' Crăciunul e marcat cu <b>*</b>: rândul se atribuie, dar programul poate varia.'
+           : '') +
+         '<br><br>Atingând o dată te uiți la ea: vezi confirmările și prezența de atunci. ' +
+         'Reminderele pleacă tot pentru următoarea, indiferent la ce te uiți.</p>';
+    host.innerHTML = h;
+  }
+
+  // ── alegerea datei și a echipei ─────────────────────
+
+  function fisaDuminica() {
+    var randuri = D.dateleMele.map(function (x) {
+      return '<li><button class="prow-btn" data-data="' + x.data + '">' +
+        '<span class="pbody"><span class="pname">' + esc(x.text) +
+        (x.eveniment ? ' — ' + esc(x.eveniment) : '') + '</span>' +
+        '<span class="pnote">' + (x.trecut ? 'trecută' : x.data === D.dataTinta ? 'următoarea' : '') +
+        '</span></span>' +
+        (x.data === D.data ? '<span class="chip" data-k="yes">deschisă</span>' : '') +
+        '</button></li>';
+    }).join('');
+
+    deschide(
+      '<div class="sheet-head"><div><h2>La ce dată te uiți</h2>' +
+      '<p>Confirmările și prezența se țin separat pentru fiecare zi de slujire</p></div>' +
+      '<button class="sheet-close" data-close="1">Închide</button></div>' +
+      '<div class="sheet-body"><div class="card"><ul>' + randuri + '</ul></div>' +
+      '<p class="footnote" style="margin-top:0">Data pentru care se cer confirmările ' +
+      'avansează singură. Aici doar te muți cu privirea — nimic nu se schimbă pentru echipă.</p>' +
+      '</div>', function () { });
+  }
+
+  function fisaEchipe() {
+    var randuri = D.echipe.map(function (e) {
+      return '<li><button class="prow-btn" data-echipa="' + e.id + '">' +
+        '<span class="pbody"><span class="pname">' + esc(e.nume) + '</span>' +
+        '<span class="pnote">' + esc(e.grup) +
+        (e.model === 'schimb' ? ' · schimb din bazin' :
+         e.model === 'rotatie' ? ' · rotație la 5 săptămâni' : ' · în fiecare duminică') +
+        '</span></span>' +
+        (e.id === D.echipa.id ? '<span class="chip" data-k="yes">deschisă</span>' : '') +
+        '</button></li>';
+    }).join('');
+
+    deschide(
+      '<div class="sheet-head"><div><h2>Echipele</h2>' +
+      '<p>Vezi tot — fiecare coordonator vede doar echipa lui</p></div>' +
+      '<button class="sheet-close" data-close="1">Închide</button></div>' +
+      '<div class="sheet-body"><div class="card"><ul>' + randuri + '</ul></div></div>',
+      function () { });
+  }
+
+  // ── cine e de serviciu (echipele cu schimb) ─────────
+
+  function cardSchimb() {
+    if (!eSchimb()) return '';
+    var alesi = activi().length;
+    var bazin = totiActivii().length;
+    var tinta = D.echipa.marimeSchimb;
+
+    return '<div class="section-head"><h2 class="section-title">De serviciu</h2>' +
+      '<span class="section-title">' + alesi + (tinta ? '/' + tinta : '') + '</span></div>' +
+      '<div class="card"' + (alesi ? '' : ' data-tone="gap"') + '><div style="padding:0.85rem">' +
+      (alesi
+        ? '<p style="margin:0 0 0.7rem">Pentru ' + esc(ziuaText()) + ' sunt de serviciu <b>' +
+          alesi + '</b> din cei ' + bazin + ' activi.</p>'
+        : '<p style="margin:0 0 0.7rem"><b>Încă n-ai ales cine e de serviciu</b> pentru ' +
+          esc(ziuaText()) + '. Până alegi, nu are cui să i se ceară confirmarea.</p>') +
+      '<div class="bulk"><button class="btn' + (alesi ? '' : ' btn-primary') +
+        '" data-schimb="1">' + (alesi ? 'Schimbă cine e de serviciu' : 'Alege schimbul') +
+      '</button></div></div></div>';
+  }
+
+  function fisaSchimb() {
+    var lot = totiActivii().slice().sort(function (a, b) {
+      return a.nume < b.nume ? -1 : 1;
+    });
+    var alesi = lot.filter(function (m) { return m.deServiciu; }).length;
+    var tinta = D.echipa.marimeSchimb;
+
+    var randuri = lot.map(function (m) {
+      return '<li><button class="prow-btn" data-serv="' + m.id + '" data-absent="' +
+        (!m.deServiciu) + '">' +
+        '<span class="mark">' + (m.deServiciu ? TICK : CROSS) + '</span>' +
+        '<span class="pbody"><span class="pname">' + esc(m.nume) + '</span>' +
+        '<span class="pnote">' + esc(m.rol || m.departament) +
+        (m.telefon ? ' · ' + esc(m.telefon) : '') + '</span></span></button></li>';
+    }).join('');
+
+    deschide(
+      '<div class="sheet-head"><div><h2>Cine e de serviciu</h2>' +
+      '<p>' + esc(ziuaText()) + ' · ' + alesi + (tinta ? ' din ' + tinta + ' obișnuiți' : ' aleși') +
+      '</p></div><button class="sheet-close" data-close="1">Închide</button></div>' +
+      '<div class="sheet-body"><div class="card"><ul>' + randuri + '</ul></div>' +
+      '<p class="footnote" style="margin-top:0">Alegerea e doar pentru ziua asta. ' +
+      'Restul echipei rămâne în bazin și nu primește nimic.</p></div>',
+      function () { });
+  }
+
+  // ── foaia modală ────────────────────────────────────
+
+  function deschide(html, onClick) {
+    inchide();
+    var s = document.createElement('div');
+    s.className = 'scrim';
+    s.innerHTML = '<div class="sheet" role="dialog" aria-modal="true">' + html + '</div>';
+    s.addEventListener('click', function (ev) {
+      if (ev.target === s || ev.target.closest('[data-close]')) { inchide(); randeaza(); return; }
+      onClick(ev);
+    });
+    document.body.appendChild(s);
+    sheet = s;
+  }
+
+  function inchide() { if (sheet) { sheet.remove(); sheet = null; } }
+
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { inchide(); randeaza(); } });
+
+  // ── evenimente ──────────────────────────────────────
+
+  document.body.addEventListener('click', function (ev) {
+    if (ev.target.closest('#dayline')) { fisaDuminica(); return; }
+
+    var q = ev.target.closest('[data-q]');
+    if (q) {
+      var kind = q.getAttribute('data-q');
+      var ids = deTrimis().filter(function (m) {
+        var s = stare(m);
+        return kind === 'fara' ? (s === 'none' || s === 'wait' || s === 'due') : s === kind;
+      }).map(function (m) { return m.id; });
+      if (ids.length) serie(ids, 0);
+      return;
+    }
+
+    if (ev.target.closest('[data-grup]')) {
+      var txt = document.getElementById('textGrup').textContent;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(txt).then(
+          function () { toast('Copiat — lipește în grup'); },
+          function () { toast('Nu am putut copia'); });
+      } else { toast('Copierea nu merge aici'); }
+      return;
+    }
+
+    var beu = ev.target.closest('[data-eu]');
+    if (beu) {
+      var v = beu.getAttribute('data-eu');
+      beu.disabled = true;
+      google.script.run
+        .withSuccessHandler(function (nou) { aplica(nou); randeaza(); toast(v === 'reset' ? 'Răspuns șters' : 'Notat'); })
+        .withFailureHandler(function () { toast('Nu s-a putut salva'); beu.disabled = false; })
+        .raspundePentru(D.vizitatorId, v === 'reset' ? '' : v === 'da' ? 'da' : 'nu', '', D.data, D.echipa.id);
+      return;
+    }
+
+    var one = ev.target.closest('[data-one]');
+    if (one) { serie([one.getAttribute('data-one')], 0); return; }
+
+    var mm = ev.target.closest('[data-m]');
+    if (mm) { fisaMembru(mm.getAttribute('data-m')); return; }
+
+    if (ev.target.closest('[data-add]')) { fisaAdaugare(); return; }
+
+    var pz = ev.target.closest('[data-prez]');
+    if (pz) {
+      var id = pz.getAttribute('data-prez');
+      var m = byId(id);
+      var nou = !(m.prezent === false) ? false : true;
+      m.prezent = nou;
+      renderSunday();
+      google.script.run
+        .withSuccessHandler(function (d) { aplica(d); randeaza(); })
+        .withFailureHandler(function () { toast('Nu s-a putut salva'); })
+        .noteazaPrezenta(id, nou, D.data, D.echipa.id);
+      return;
+    }
+
+    if (ev.target.closest('[data-echipe]')) { fisaEchipe(); return; }
+    if (ev.target.closest('[data-schimb]')) { fisaSchimb(); return; }
+
+    // Mutarea privirii pe altă zi de slujire, sau pe altă echipă.
+    var dd = ev.target.closest('[data-data]');
+    var de = ev.target.closest('[data-echipa]');
+    if (dd || de) {
+      var idE = de ? de.getAttribute('data-echipa') : D.echipa.id;
+      var zi = dd ? dd.getAttribute('data-data') : '';
+      (dd || de).disabled = true;
+      google.script.run
+        .withSuccessHandler(function (nou) { aplica(nou); inchide(); randeaza(); })
+        .withFailureHandler(function () { toast('Nu s-a putut deschide'); inchide(); })
+        .schimba(D.token, idE, zi);
+      return;
+    }
+
+    var sv = ev.target.closest('[data-serv]');
+    if (sv) {
+      var idm = sv.getAttribute('data-serv');
+      var mm2 = byId(idm);
+      mm2.deServiciu = !mm2.deServiciu;
+      sv.setAttribute('data-absent', String(!mm2.deServiciu));
+      sv.querySelector('.mark').innerHTML = mm2.deServiciu ? TICK : CROSS;
+      google.script.run
+        .withSuccessHandler(function (nou) { aplica(nou); })
+        .withFailureHandler(function () { toast('Nu s-a putut salva'); })
+        .comutaServiciu(idm, D.data, D.echipa.id);
+      return;
+    }
+
+    var t = ev.target.closest('.tab');
+    if (t) {
+      var p = t.getAttribute('data-p');
+      var tabs = document.querySelectorAll('.tab');
+      for (var i = 0; i < tabs.length; i++) tabs[i].setAttribute('aria-selected', tabs[i] === t ? 'true' : 'false');
+      var pan = document.querySelectorAll('[data-panel]');
+      for (var j = 0; j < pan.length; j++) pan[j].hidden = pan[j].getAttribute('data-panel') !== p;
+    }
+  });
+
+  // ── randare ─────────────────────────────────────────
+
+  function randeaza() {
+    document.getElementById('testbar').hidden = !D.config.MOD_TEST;
+    document.getElementById('bandEchipa').innerHTML =
+      (D.vizitator ? esc(D.vizitator) + '<br>' : '') +
+      '<span style="color:var(--ink-soft);font-weight:400">' + esc(D.echipa.nume) +
+        (D.esteAdmin && D.echipe.length > 1
+          ? ' <b data-echipe="1" style="color:var(--gold);cursor:pointer">schimbă</b>' : '') +
+      '</span>';
+    document.getElementById('dayline').textContent = ziuaText() +
+      (D.data < D.azi ? ' · trecută' : D.data !== D.dataTinta ? ' · nu e următoarea' : '');
+
+    var c = numara(), t = Math.max(activi().length, 1);
+    document.getElementById('progress').innerHTML =
+      '<i data-k="yes" style="width:' + (c.yes / t * 100) + '%"></i>' +
+      '<i data-k="covered" style="width:' + (c.covered / t * 100) + '%"></i>' +
+      '<i data-k="gap" style="width:' + (c.gap / t * 100) + '%"></i>';
+
+    renderSend(); renderBoard(); renderSunday(); renderTeam(); renderDates();
+  }
+
+  // ── pornirea ────────────────────────────────────────────
+
+  function poarta(titlu, text, buton) {
+    var p = document.getElementById('poarta');
+    document.getElementById('poartaTitlu').textContent = titlu;
+    document.getElementById('poartaText').textContent = text;
+    document.getElementById('poartaBtn').hidden = !buton;
+    p.hidden = false;
+  }
+
+  function porneste() {
+    if (!tokenul()) {
+      poarta('Îți trebuie linkul tău',
+             'Deschide o dată linkul primit de la coordonarea Asimilării. ' +
+             'Telefonul îl ține minte pe urmă, și aplicația se deschide direct.',
+             false);
+      return;
+    }
+    poarta('Se încarcă…', 'Aducem datele echipei.', false);
+    cheama('stare', []).then(function (d) {
+      D = d;
+      document.getElementById('poarta').hidden = true;
+      randeaza();
+    }, function (er) {
+      poarta('N-am putut încărca',
+             navigator.onLine ? String(er.message || er)
+                              : 'Pare că nu ai semnal. Încearcă din nou când revine.',
+             true);
+    });
+  }
+
+  document.getElementById('poartaBtn').onclick = porneste;
+
+  // Datele se învechesc cât stă aplicația deschisă în fundal — la revenire,
+  // le luăm din nou. Altfel ai vedea confirmări de acum două ore. Dar nu la
+  // fiecare clipire: dacă tocmai am cerut, lăsăm în pace.
+  var ultimaCerere = Date.now();
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && D && Date.now() - ultimaCerere > 60000) {
+      ultimaCerere = Date.now();
+      cheama('reincarca', [D.echipa.id, D.data]).then(function (d) {
+        aplica(d); randeaza();
+      }, function () { /* tăcere: rămâne ce era pe ecran */ });
+    }
+  });
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () { /* merge și fără */ });
+    });
+  }
+
+  porneste();
+</script>
+</body>
+</html>

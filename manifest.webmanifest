@@ -1,0 +1,16 @@
+{
+  "name": "Asimilare — Biserica Harvest Arad",
+  "short_name": "Asimilare",
+  "description": "Confirmări și prezență pentru echipele de Asimilare.",
+  "lang": "ro",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#16171c",
+  "theme_color": "#16171c",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
