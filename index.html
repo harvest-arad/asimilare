@@ -358,6 +358,7 @@
 <script>
   var API = 'https://script.google.com/macros/s/AKfycbwR4hgy9L7wIfbxTOqqlUJvj7kJJE6WjsGwCXK3I9rNQqr5jkaMxxS25hnsQowqxqE/exec';
   var CHEIE = 'asimilare.token';
+  var CHEIE_APARAT = 'asimilare.aparat';
 
   var D = null;
 
@@ -384,6 +385,27 @@
     catch (e) { return (_token = ''); }
   }
 
+  /**
+   * Identificatorul telefonului. Se face o dată, aleator, și rămâne aici.
+   * Serverul îl leagă de token la prima deschidere; de atunci, linkul merge
+   * doar de pe telefonul ăsta.
+   *
+   * Dacă browserul refuză stocarea (mod privat), întoarcem gol — și serverul
+   * lasă să treacă fără să lege. Altfel omul s-ar încuia singur afară la a
+   * doua deschidere, fiindcă n-ar avea de unde să-și amintească cine e.
+   */
+  function aparatul() {
+    try {
+      var a = localStorage.getItem(CHEIE_APARAT);
+      if (!a) {
+        a = (Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
+        localStorage.setItem(CHEIE_APARAT, a);
+        if (localStorage.getItem(CHEIE_APARAT) !== a) return '';
+      }
+      return a;
+    } catch (e) { return ''; }
+  }
+
   // Numele metodelor sunt cele din vechea pagină; aici doar le traducem în
   // parametri de adresă. Interfața nu știe că s-a schimbat ceva.
   var ARGUMENTE = {
@@ -407,6 +429,7 @@
     var par = ARGUMENTE[metoda].apply(null, argumente) || {};
     if (!par.api) par.api = metoda;
     par.t = tokenul();
+    par.dev = aparatul();
     var q = Object.keys(par)
       .filter(function (k) { return par[k] !== undefined && par[k] !== null && par[k] !== ''; })
       .map(function (k) { return k + '=' + encodeURIComponent(par[k]); })
@@ -1355,10 +1378,13 @@
       document.getElementById('poarta').hidden = true;
       randeaza();
     }, function (er) {
-      poarta('N-am putut încărca',
-             navigator.onLine ? String(er.message || er)
-                              : 'Pare că nu ai semnal. Încearcă din nou când revine.',
-             true);
+      var mesaj = String(er.message || er);
+      var aparat = mesaj.indexOf('alt telefon') >= 0;
+      poarta(aparat ? 'Linkul e legat de alt telefon' : 'N-am putut încărca',
+             aparat ? mesaj
+                    : (navigator.onLine ? mesaj
+                       : 'Pare că nu ai semnal. Încearcă din nou când revine.'),
+             !aparat);
     });
   }
 
