@@ -231,6 +231,21 @@
     letter-spacing: 0.03em; color: var(--ink); cursor: pointer;
   }
 
+  /* Răspunsuri sau prezență: același tab, două moduri. Ziua alege singură;
+     comutatorul e pentru când vrei altceva decât ce-a ales ea. */
+  .moduri { display: flex; gap: 0.35rem; margin: 0 0 1rem; }
+
+  .mod {
+    appearance: none; flex: 1 1 0; min-height: 2.4rem; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface);
+    border-radius: var(--radius); color: var(--ink-mute);
+    font-family: var(--font-display); font-size: 0.7rem; font-weight: 800;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+
+  .mod[aria-pressed="true"] { background: var(--band); color: var(--gold); border-color: var(--gold); }
+  .mod:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
   /* Un link care arată ca buton — WhatsApp trebuie să fie ancoră, nu buton. */
   a.btn { display: flex; align-items: center; justify-content: center; text-decoration: none; }
 
@@ -354,7 +369,6 @@
     <div class="progress" id="progress"></div>
     <div class="tabs" role="tablist" id="tabs">
       <button class="tab" data-p="send" aria-selected="true">Trimite</button>
-      <button class="tab" data-p="board" aria-selected="false">Răspunsuri</button>
       <button class="tab" data-p="sunday" aria-selected="false">Duminică</button>
       <button class="tab" data-p="team" aria-selected="false">Echipa</button>
       <button class="tab" data-p="dates" aria-selected="false">Datele mele</button>
@@ -364,7 +378,6 @@
 
 <div class="shell">
   <section class="panel" data-panel="send"></section>
-  <section class="panel" data-panel="board" hidden></section>
   <section class="panel" data-panel="sunday" hidden></section>
   <section class="panel" data-panel="team" hidden></section>
   <section class="panel" data-panel="dates" hidden></section>
@@ -840,10 +853,33 @@
       });
   }
 
-  // ── Răspunsuri ──────────────────────────────────────
+  // ── Duminică: răspunsuri până în ziua slujirii, prezență după ─────────
 
-  function renderBoard() {
-    var host = document.querySelector('[data-panel="board"]');
+  // null = lasă ziua să aleagă. 'raspunsuri' / 'prezenta' = ai ales tu.
+  var modAles = null;
+
+  function modulZilei() {
+    if (modAles) return modAles;
+    return D.fataDeAzi <= 0 ? 'prezenta' : 'raspunsuri';
+  }
+
+  function comutatorMod() {
+    var m = modulZilei();
+    return '<div class="moduri">' +
+      '<button class="mod" data-mod="raspunsuri" aria-pressed="' + (m === 'raspunsuri') + '">Răspunsuri</button>' +
+      '<button class="mod" data-mod="prezenta" aria-pressed="' + (m === 'prezenta') + '">Prezență</button>' +
+      '</div>';
+  }
+
+  function renderSunday() {
+    var host = document.querySelector('[data-panel="sunday"]');
+    host.innerHTML = comutatorMod() +
+      (modulZilei() === 'prezenta' ? blocPrezenta() : blocRaspunsuri());
+  }
+
+  // ── modul „răspunsuri" ──────────────────────────────
+
+  function blocRaspunsuri() {
     var c = numara();
 
     var h = '<div class="stat-strip">' +
@@ -860,10 +896,10 @@
     } else {
       h += '<div class="card" data-tone="gap"><ul>';
       goluri.forEach(function (m) {
-        h += '<li><div class="prow"><span class="pbody">' +
-          '<span class="pname">' + esc(m.departament) + (m.rol ? ' — ' + esc(m.rol) : '') + '</span>' +
+        h += '<li><button class="prow-btn" data-rasp="' + m.id + '">' +
+          '<span class="pbody"><span class="pname">' + esc(m.departament) + (m.rol ? ' — ' + esc(m.rol) : '') + '</span>' +
           '<span class="pnote">lipsește ' + esc(m.nume) + ', fără înlocuitor</span></span>' +
-          '<span class="chip" data-k="gap">gol</span></div></li>';
+          '<span class="chip" data-k="gap">gol</span></button></li>';
       });
       h += '</ul></div>';
     }
@@ -877,21 +913,58 @@
       lot.forEach(function (m) {
         var s = stare(m);
         var nota = s === 'covered' ? 'înlocuit de ' + m.inlocuitor : (prinCine(m) || m.rol || '—');
-        h += '<li><div class="prow"><span class="pbody"><span class="pname">' + esc(m.nume) + '</span>' +
+        h += '<li><button class="prow-btn" data-rasp="' + m.id + '">' +
+          '<span class="pbody"><span class="pname">' + esc(m.nume) + '</span>' +
           '<span class="pnote">' + esc(nota) + '</span></span>' +
-          '<span class="chip" data-k="' + s + '">' + ETICHETA[s] + '</span></div></li>';
+          '<span class="chip" data-k="' + s + '">' + ETICHETA[s] + '</span></button></li>';
       });
       h += '</ul></div>';
     });
 
-    h += '<p class="footnote">Golurile sunt singurul lucru care cere acțiune: cineva a spus că nu poate și n-a găsit înlocuitor.</p>';
-    host.innerHTML = h;
+    h += '<p class="footnote">Atinge pe cineva ca să-i pui sau să-i ștergi răspunsul. ' +
+         'Pe cine nu atingi rămâne fără răspuns — nu presupunem nimic în locul omului.<br><br>' +
+         'Golurile sunt singurul lucru care cere acțiune: cineva a spus că nu poate și n-a găsit înlocuitor.</p>';
+    return h;
   }
 
-  // ── Duminică ────────────────────────────────────────
+  /** Fișa de răspuns a unui om. Trei căi, plus înlocuitor dacă nu vine. */
+  function fisaRaspuns(id) {
+    var m = byId(id);
+    var s = stare(m);
 
-  function renderSunday() {
-    var host = document.querySelector('[data-panel="sunday"]');
+    deschide(
+      '<div class="sheet-head"><div><h2>' + esc(m.nume) + '</h2>' +
+      '<p>' + esc(m.departament) + (m.rol ? ' · ' + esc(m.rol) : '') +
+      ' · acum: ' + ETICHETA[s] + '</p></div>' +
+      '<button class="sheet-close" data-close="1">Închide</button></div>' +
+      '<div class="sheet-body">' +
+      '<div class="bulk"><button class="btn btn-primary" data-r="da">Vine</button>' +
+      '<button class="btn" data-r="nu">Nu vine</button></div>' +
+      '<label class="field" style="margin-top:0.9rem"><span>Cine vine în locul lui (opțional)</span>' +
+      '<input id="fInloc" value="' + esc(m.inlocuitor || '') + '" placeholder="numele înlocuitorului"></label>' +
+      '<div class="bulk"><button class="btn" data-r="">Șterge răspunsul</button></div>' +
+      '<p class="footnote">„Șterge răspunsul" îl readuce la „fără răspuns", ca și cum n-ar fi zis nimic. ' +
+      'Înlocuitorul se ia în seamă doar la „nu vine".</p>' +
+      '</div>',
+      function (ev) {
+        var b = ev.target.closest('[data-r]');
+        if (!b) return;
+        var r = b.getAttribute('data-r');
+        var inl = document.getElementById('fInloc');
+        b.disabled = true;
+        google.script.run
+          .withSuccessHandler(function (d) {
+            aplica(d); inchide(); randeaza();
+            toast(r === 'da' ? 'Notat: vine' : r === 'nu' ? 'Notat: nu vine' : 'Răspuns șters');
+          })
+          .withFailureHandler(function () { toast('Nu s-a putut salva'); b.disabled = false; })
+          .raspundePentru(id, r, r === 'nu' && inl ? inl.value.trim() : '', D.data, D.echipa.id);
+      });
+  }
+
+  // ── modul „prezență" ────────────────────────────────
+
+  function blocPrezenta() {
     var asteptati = activi().filter(function (m) {
       var s = stare(m);
       return s === 'yes' || s === 'covered';
@@ -907,9 +980,8 @@
             '</div>';
 
     if (!asteptati.length) {
-      h += '<div class="card"><p class="empty">Nimeni n-a confirmat încă.</p></div>';
-      host.innerHTML = h;
-      return;
+      return h + '<div class="card"><p class="empty">Nimeni n-a confirmat încă. ' +
+        'Treci pe „Răspunsuri" ca să notezi cine vine.</p></div>';
     }
 
     [['13:30', 'Rămân până la final (13:30)'], ['12:00', 'De obicei pleacă după 12:00']].forEach(function (g) {
@@ -933,7 +1005,7 @@
     h += '<p class="footnote">Programul echipei: ' + esc(D.config.PROGRAM_ECHIPA) + '. Serviciile: ' +
          esc(D.config.SERVICIU_1) + ' și ' + esc(D.config.SERVICIU_2) +
          '. Orele de plecare le vezi doar tu — voluntarilor nu li se spune nimic despre ele.</p>';
-    host.innerHTML = h;
+    return h;
   }
 
   // ── Echipa ──────────────────────────────────────────
@@ -1371,6 +1443,12 @@
 
     if (ev.target.closest('[data-add]')) { fisaAdaugare(); return; }
 
+    var br = ev.target.closest('[data-rasp]');
+    if (br) { fisaRaspuns(br.getAttribute('data-rasp')); return; }
+
+    var bm = ev.target.closest('[data-mod]');
+    if (bm) { modAles = bm.getAttribute('data-mod'); renderSunday(); return; }
+
     var pz = ev.target.closest('[data-prez]');
     if (pz) {
       var id = pz.getAttribute('data-prez');
@@ -1445,7 +1523,7 @@
       '<i data-k="covered" style="width:' + (c.covered / t * 100) + '%"></i>' +
       '<i data-k="gap" style="width:' + (c.gap / t * 100) + '%"></i>';
 
-    renderSend(); renderBoard(); renderSunday(); renderTeam(); renderDates();
+    renderSend(); renderSunday(); renderTeam(); renderDates();
   }
 
   // ── pornirea ────────────────────────────────────────────
