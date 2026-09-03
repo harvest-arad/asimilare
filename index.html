@@ -365,11 +365,11 @@
 <header class="masthead">
   <div class="masthead-inner">
     <button class="dayline" id="dayline" type="button"></button>
-    <h1 class="title">Confirmări pentru duminică</h1>
+    <h1 class="title" id="titluZi">Confirmări</h1>
     <div class="progress" id="progress"></div>
     <div class="tabs" role="tablist" id="tabs">
       <button class="tab" data-p="send" aria-selected="true">Trimite</button>
-      <button class="tab" data-p="sunday" aria-selected="false">Duminică</button>
+      <button class="tab" data-p="sunday" aria-selected="false">Răspunsuri</button>
       <button class="tab" data-p="team" aria-selected="false">Echipa</button>
       <button class="tab" data-p="dates" aria-selected="false">Datele mele</button>
     </div>
@@ -551,6 +551,16 @@
   // „duminică, 27 septembrie" sau „joi, 9 aprilie — Joia Mare"
   function ziuaText() {
     return D.duminicaText + (D.eveniment ? ' — ' + D.eveniment : '');
+  }
+
+  /**
+   * Slujirea nu e totdeauna duminica: mai e Joia Mare, Vinerea Mare, Paștele,
+   * Crăciunul, Anul Nou. Titlul ia numele zilei din date, nu îl presupune.
+   */
+  function titluZilei() {
+    if (D.eveniment) return 'Confirmări pentru ' + D.eveniment;
+    var zi = String(D.duminicaText || '').split(',')[0].trim();
+    return zi ? 'Confirmări pentru ' + zi : 'Confirmări';
   }
 
   // Coordonatorul nu-și trimite mesaj lui însuși — își notează răspunsul
@@ -972,7 +982,7 @@
     var prezenti = asteptati.filter(function (m) { return m.prezent !== false; }).length;
 
     var h = '<p class="lede">Toți cei care au confirmat pornesc ca prezenți. Atinge doar pe cine ' +
-            'nu a venit. Cine își schimbă răspunsul duminică dimineața dispare singur din listă.</p>' +
+            'nu a venit. Cine își schimbă răspunsul în dimineața slujirii dispare singur din listă.</p>' +
             '<div class="stat-strip" style="grid-template-columns:repeat(3,1fr)">' +
             '<div class="stat" data-k="yes"><div class="stat-num">' + prezenti + '</div><div class="stat-lbl">prezenți</div></div>' +
             '<div class="stat" data-k="gap"><div class="stat-num">' + (asteptati.length - prezenti) + '</div><div class="stat-lbl">nu au venit</div></div>' +
@@ -984,10 +994,10 @@
         'Treci pe „Răspunsuri" ca să notezi cine vine.</p></div>';
     }
 
-    [['13:30', 'Rămân până la final (13:30)'], ['12:00', 'De obicei pleacă după 12:00']].forEach(function (g) {
-      var lot = asteptati.filter(function (m) { return String(m.panaLa) === g[0]; });
+    DEPTS().forEach(function (dep) {
+      var lot = asteptati.filter(function (m) { return m.departament === dep; });
       if (!lot.length) return;
-      h += '<div class="section-head"><h2 class="section-title">' + g[1] + '</h2>' +
+      h += '<div class="section-head"><h2 class="section-title">' + esc(dep) + '</h2>' +
            '<span class="section-title">' + lot.length + '</span></div><div class="card"><ul>';
       lot.forEach(function (m) {
         var abs = m.prezent === false;
@@ -1003,8 +1013,7 @@
     });
 
     h += '<p class="footnote">Programul echipei: ' + esc(D.config.PROGRAM_ECHIPA) + '. Serviciile: ' +
-         esc(D.config.SERVICIU_1) + ' și ' + esc(D.config.SERVICIU_2) +
-         '. Orele de plecare le vezi doar tu — voluntarilor nu li se spune nimic despre ele.</p>';
+         esc(D.config.SERVICIU_1) + ' și ' + esc(D.config.SERVICIU_2) + '.</p>';
     return h;
   }
 
@@ -1143,9 +1152,6 @@
         esc(rolCu(m.rol, false)) + '" placeholder="ex. sunet, primire"></label>' +
       comutator + linkCoord +
       '<label class="field"><span>Familie</span><input id="fF" value="' + esc(m.familie) + '" placeholder="ex. Ciba — aceeași etichetă la toți din familie"></label>' +
-      '<label class="field"><span>Stă până la</span><select id="fP">' +
-        ['12:00', '13:30'].map(function (o) { return '<option' + (o === String(m.panaLa) ? ' selected' : '') + '>' + o + '</option>'; }).join('') +
-      '</select></label>' +
       '<div class="bulk"><button class="btn btn-primary" data-act="salveaza">Salvează</button></div>' + actiuni +
       '</div>',
       function (ev) {
@@ -1171,7 +1177,6 @@
           var vreaCoord = document.getElementById('fCoord').checked;
           date.rol = rolCu(document.getElementById('fR').value.trim(), vreaCoord);
           date.familie = document.getElementById('fF').value.trim();
-          date.panaLa = document.getElementById('fP').value;
         } else if (k === 'pauza') {
           date.stare = 'pauza';
           var n = document.getElementById('fPauza');
@@ -1501,6 +1506,10 @@
       for (var i = 0; i < tabs.length; i++) tabs[i].setAttribute('aria-selected', tabs[i] === t ? 'true' : 'false');
       var pan = document.querySelectorAll('[data-panel]');
       for (var j = 0; j < pan.length; j++) pan[j].hidden = pan[j].getAttribute('data-panel') !== p;
+
+      // Intri din nou în tab → pornești de unde e firesc pentru ziua de azi.
+      // Comutatorul rămâne pentru ocolul de moment, nu ți-l ține minte la infinit.
+      if (p === 'sunday') { modAles = null; renderSunday(); }
     }
   });
 
@@ -1514,6 +1523,7 @@
         (D.esteAdmin && D.echipe.length > 1
           ? ' <b data-echipe="1" style="color:var(--gold);cursor:pointer">schimbă</b>' : '') +
       '</span>';
+    document.getElementById('titluZi').textContent = titluZilei();
     document.getElementById('dayline').textContent = ziuaText() +
       (D.data < D.azi ? ' · trecută' : D.data !== D.dataTinta ? ' · nu e următoarea' : '');
 
