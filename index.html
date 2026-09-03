@@ -1282,7 +1282,9 @@
           b.disabled = true;
           google.script.run
             .withSuccessHandler(function (nou) {
-              aplica(nou); inchide(); randeaza();
+              // Nu închidem întâi: `deschide` scoate singur fișa veche, iar
+              // intrarea din istoric rămâne a fișei — una singură, cum trebuie.
+              aplica(nou); randeaza();
               fisaMembru(m.id); toast('Are acces — trimite-i linkul');
             })
             .withFailureHandler(function () { toast('Nu s-a putut salva'); b.disabled = false; })
@@ -1482,8 +1484,16 @@
 
   // ── foaia modală ────────────────────────────────────
 
+  /**
+   * Fișele se pun în istoricul telefonului, ca butonul „înapoi" să le închidă în
+   * loc să te scoată din aplicație. Deschiderea pune o intrare, „înapoi" o
+   * consumă, iar închiderea din buton o dă înapoi ea însăși — ca să nu rămână
+   * agățată o apăsare de „înapoi" care nu face nimic.
+   */
+  var _fisaInIstoric = false;
+
   function deschide(html, onClick) {
-    inchide();
+    inchideDoar();
     var s = document.createElement('div');
     s.className = 'scrim';
     s.innerHTML = '<div class="sheet" role="dialog" aria-modal="true">' + html + '</div>';
@@ -1493,9 +1503,31 @@
     });
     document.body.appendChild(s);
     sheet = s;
+
+    if (!_fisaInIstoric) {
+      try { history.pushState({ fisa: 1 }, ''); _fisaInIstoric = true; }
+      catch (e) { /* fără istoric, aplicația merge la fel */ }
+    }
   }
 
-  function inchide() { if (sheet) { sheet.remove(); sheet = null; } }
+  /** Scoate fișa de pe ecran, fără să umble la istoric. */
+  function inchideDoar() { if (sheet) { sheet.remove(); sheet = null; } }
+
+  function inchide() {
+    inchideDoar();
+    if (!_fisaInIstoric) return;
+    _fisaInIstoric = false;
+    try { history.back(); } catch (e) { /* n-avem ce consuma */ }
+  }
+
+  // „Înapoi" de pe telefon: dacă e o fișă deschisă, o închide și atât. Dacă nu,
+  // lăsăm browserul să facă ce face de obicei — adică să iasă din aplicație.
+  window.addEventListener('popstate', function () {
+    if (!sheet) return;
+    _fisaInIstoric = false;        // intrarea tocmai a fost consumată
+    inchideDoar();
+    randeaza();
+  });
 
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { inchide(); randeaza(); } });
 
