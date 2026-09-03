@@ -854,13 +854,61 @@
         if (!b) return;
         var k = b.getAttribute('data-act');
         if (k === 'skip') { serie(ids, i + 1); return; }
-        b.disabled = true;
         var fn = (k === 'verbal') ? 'noteazaVerbal' : 'noteazaTrimis';
-        google.script.run
-          .withSuccessHandler(function (nou) { aplica(nou); serie(ids, i + 1); })
-          .withFailureHandler(function () { toast('Nu s-a putut salva'); b.disabled = false; })
-          [fn](m.id, D.data, D.echipa.id);
+        optimist([m.id],
+          function () {
+            var mm = byId(m.id);
+            if (k === 'verbal') { mm.raspuns = 'nu'; mm.via = 'verbal'; mm.inlocuitor = ''; }
+            else { mm.trimisLa = mm.trimisLa || D.azi; mm.ultimPing = D.azi; }
+          },
+          function (reusit, esuat) {
+            google.script.run.withSuccessHandler(reusit).withFailureHandler(esuat)[fn](m.id, D.data, D.echipa.id);
+          });
+        serie(ids, i + 1);
       });
+  }
+
+  // ── salvare optimistă ───────────────────────────────
+  //
+  // Apps Script răspunde în ~1,5 secunde în cel mai bun caz, și în 8 după o
+  // pauză. Dacă fiecare atingere ar aștepta răspunsul, aplicația ar părea moartă
+  // exact în clipa în care omul a apăsat. Așa că schimbăm ecranul pe loc și
+  // salvăm în fundal; dacă salvarea cade, ne întoarcem de unde am plecat.
+
+  var _inZbor = 0;
+
+  /**
+   * @param {Array}    ids       cine se schimbă — ca să știm ce dăm înapoi la eșec
+   * @param {Function} schimba   modifică `D` pe loc
+   * @param {Function} porneste  primește (reușit, eșuat) și cheamă serverul
+   */
+  function optimist(ids, schimba, porneste, mesajEroare) {
+    var copie = {};
+    (ids || []).forEach(function (id) {
+      var m = byId(id);
+      if (m) copie[id] = JSON.parse(JSON.stringify(m));
+    });
+
+    schimba();
+    randeaza();
+
+    _inZbor++;
+    porneste(
+      function (nou) {
+        _inZbor--;
+        // Un răspuns întârziat n-are voie să șteargă o atingere mai nouă.
+        if (_inZbor === 0 && nou) { aplica(nou); randeaza(); }
+      },
+      function () {
+        _inZbor--;
+        Object.keys(copie).forEach(function (id) {
+          var m = byId(id);
+          if (m) Object.keys(copie[id]).forEach(function (k) { m[k] = copie[id][k]; });
+        });
+        randeaza();
+        toast(mesajEroare || 'Nu s-a putut salva');
+      }
+    );
   }
 
   // ── Duminică: răspunsuri până în ziua slujirii, prezență după ─────────
@@ -937,6 +985,30 @@
     return h;
   }
 
+  /**
+   * Cât de des vine omul. Arătăm și cifrele brute, nu doar procentul: „3 din 4"
+   * spune limpede că e devreme, pe când „75%" pare o judecată așezată.
+   */
+  function blocIstoric(m) {
+    var h = m.istoric;
+    if (!h || !h.total) {
+      return '<div class="contact"><b>Prezență</b><span>încă n-avem duminici trecute</span></div>';
+    }
+    if (!h.confirmate) {
+      return '<div class="contact"><b>Prezență</b><span>n-a confirmat la nicio duminică din ' +
+        h.total + '</span></div>';
+    }
+    var pct = Math.round(h.venite / h.confirmate * 100);
+    return '<div class="contact"><b>A venit de ' + h.venite + ' ori din ' + h.confirmate +
+      ' confirmate</b>' +
+      '<span>' + pct + '% din câte a confirmat</span></div>' +
+      '<div class="contact"><b>A confirmat la ' + h.confirmate + ' din ' + h.total + '</b>' +
+      '<span>' + (h.refuzate
+        ? 'a anunțat că nu poate ' + (h.refuzate === 1 ? 'o dată' : 'de ' + h.refuzate + ' ori')
+        : 'duminici ale echipei') +
+      '</span></div>';
+  }
+
   /** Fișa de răspuns a unui om. Trei căi, plus înlocuitor dacă nu vine. */
   function fisaRaspuns(id) {
     var m = byId(id);
@@ -961,14 +1033,20 @@
         if (!b) return;
         var r = b.getAttribute('data-r');
         var inl = document.getElementById('fInloc');
-        b.disabled = true;
-        google.script.run
-          .withSuccessHandler(function (d) {
-            aplica(d); inchide(); randeaza();
-            toast(r === 'da' ? 'Notat: vine' : r === 'nu' ? 'Notat: nu vine' : 'Răspuns șters');
-          })
-          .withFailureHandler(function () { toast('Nu s-a putut salva'); b.disabled = false; })
-          .raspundePentru(id, r, r === 'nu' && inl ? inl.value.trim() : '', D.data, D.echipa.id);
+        var inlocuitor = (r === 'nu' && inl) ? inl.value.trim() : '';
+        inchide();
+        optimist([id],
+          function () {
+            var mm = byId(id);
+            mm.raspuns = r;
+            mm.inlocuitor = inlocuitor;
+            mm.via = r ? 'coordonator' : '';
+          },
+          function (reusit, esuat) {
+            google.script.run.withSuccessHandler(reusit).withFailureHandler(esuat)
+              .raspundePentru(id, r, inlocuitor, D.data, D.echipa.id);
+          });
+        toast(r === 'da' ? 'Notat: vine' : r === 'nu' ? 'Notat: nu vine' : 'Răspuns șters');
       });
   }
 
@@ -1098,7 +1176,8 @@
           '<a class="contact" href="https://wa.me/' + tel + '" target="_blank" rel="noopener"><b>WhatsApp</b><span>conversație</span></a>'
         : '') +
       (m.email ? '<a class="contact" href="mailto:' + esc(m.email) + '"><b>' + esc(m.email) + '</b><span>email</span></a>' : '') +
-      '<div class="contact"><b>Linkul lui</b><span>' + esc(m.link.slice(-14)) + '</span></div>';
+      '<div class="contact"><b>Linkul lui</b><span>' + esc(m.link.slice(-14)) + '</span></div>' +
+      blocIstoric(m);
 
     // Linkul de coordonator, gata de dat mai departe. Apare doar dacă omul chiar
     // are acces acum — altfel ar circula un link care nu deschide nimic.
@@ -1197,15 +1276,32 @@
         var tocmaiPromovat = k === 'salveaza' && !m.linkAdmin &&
           date.rol.toLowerCase().indexOf('coordonator') >= 0 && date.stare === 'activ';
 
-        b.disabled = true;
-        google.script.run
-          .withSuccessHandler(function (nou) {
-            aplica(nou); inchide(); randeaza();
-            if (tocmaiPromovat) { fisaMembru(m.id); toast('Are acces — trimite-i linkul'); }
-            else { toast('Salvat'); }
-          })
-          .withFailureHandler(function () { toast('Nu s-a putut salva'); b.disabled = false; })
-          .salveazaMembru(date, D.data, D.echipa.id);
+        // Când tocmai l-ai făcut coordonator, linkul lui vine de la server —
+        // ăsta e singurul caz în care chiar merită așteptat.
+        if (tocmaiPromovat) {
+          b.disabled = true;
+          google.script.run
+            .withSuccessHandler(function (nou) {
+              aplica(nou); inchide(); randeaza();
+              fisaMembru(m.id); toast('Are acces — trimite-i linkul');
+            })
+            .withFailureHandler(function () { toast('Nu s-a putut salva'); b.disabled = false; })
+            .salveazaMembru(date, D.data, D.echipa.id);
+          return;
+        }
+
+        inchide();
+        optimist([m.id],
+          function () {
+            var mm = byId(m.id);
+            ['nume', 'telefon', 'email', 'departament', 'rol', 'familie', 'panaLa', 'stare', 'motivPauza']
+              .forEach(function (c) { if (date[c] !== undefined) mm[c] = date[c]; });
+          },
+          function (reusit, esuat) {
+            google.script.run.withSuccessHandler(reusit).withFailureHandler(esuat)
+              .salveazaMembru(date, D.data, D.echipa.id);
+          });
+        toast('Salvat');
       });
   }
 
@@ -1432,11 +1528,17 @@
     var beu = ev.target.closest('[data-eu]');
     if (beu) {
       var v = beu.getAttribute('data-eu');
-      beu.disabled = true;
-      google.script.run
-        .withSuccessHandler(function (nou) { aplica(nou); randeaza(); toast(v === 'reset' ? 'Răspuns șters' : 'Notat'); })
-        .withFailureHandler(function () { toast('Nu s-a putut salva'); beu.disabled = false; })
-        .raspundePentru(D.vizitatorId, v === 'reset' ? '' : v === 'da' ? 'da' : 'nu', '', D.data, D.echipa.id);
+      var rEu = v === 'reset' ? '' : v === 'da' ? 'da' : 'nu';
+      optimist([D.vizitatorId],
+        function () {
+          var mm = byId(D.vizitatorId);
+          if (mm) { mm.raspuns = rEu; mm.inlocuitor = ''; mm.via = rEu ? 'coordonator' : ''; }
+        },
+        function (reusit, esuat) {
+          google.script.run.withSuccessHandler(reusit).withFailureHandler(esuat)
+            .raspundePentru(D.vizitatorId, rEu, '', D.data, D.echipa.id);
+        });
+      toast(v === 'reset' ? 'Răspuns șters' : 'Notat');
       return;
     }
 
