@@ -1,12 +1,22 @@
 /**
  * Service worker — doar cât să pornească aplicația fără rețea.
  *
- * Ținem în memorie coaja: pagina, manifestul, iconița. Datele NU se cachează
- * niciodată — sunt de pe alt domeniu (Apps Script) și oricum n-are rost să
- * arate confirmări vechi de ieri. Fără semnal, aplicația pornește și spune
- * cinstit că n-a putut încărca.
+ * **Rețeaua are ultimul cuvânt la pagină.** Prima variantă servea întâi din
+ * memorie, iar coaja se împrospăta doar când se schimba fișierul ăsta — care nu
+ * se schimba niciodată. Rezultatul: publicai, dar telefonul arăta luni la rând
+ * versiunea veche. Acum pagina se cere de la rețea, iar memoria e plasa de
+ * siguranță pentru când nu e semnal.
+ *
+ * `VERSIUNE` e amprenta paginii, pusă de `construieste.py`. Se schimbă doar
+ * când se schimbă aplicația — atunci browserul vede alt service worker, îl
+ * instalează și aruncă memoria veche. Dacă n-ai schimbat nimic, nici el nu se
+ * mișcă.
+ *
+ * Datele NU se cachează niciodată: sunt de pe alt domeniu (Apps Script) și
+ * n-are rost să arate confirmări de ieri.
  */
-var CACHE = 'asimilare-v1';
+var VERSIUNE = '742c84dc726b';
+var CACHE = 'asimilare-' + VERSIUNE;
 var COAJA = ['./', './index.html', './manifest.webmanifest', './icon.png'];
 
 self.addEventListener('install', function (e) {
@@ -26,17 +36,35 @@ self.addEventListener('activate', function (e) {
   );
 });
 
+/** Pagina: rețeaua întâi, memoria doar dacă nu se poate. */
+function retiaIntai(cerere) {
+  return fetch(cerere).then(function (proaspat) {
+    var copie = proaspat.clone();
+    caches.open(CACHE).then(function (c) { c.put(cerere, copie); });
+    return proaspat;
+  }).catch(function () {
+    return caches.match(cerere).then(function (r) { return r || caches.match('./index.html'); });
+  });
+}
+
+/** Restul cojii: din memorie, dar o împrospătăm în fundal pentru data viitoare. */
+function memorieApoiRetea(cerere) {
+  return caches.match(cerere).then(function (raspuns) {
+    var deLaRetea = fetch(cerere).then(function (proaspat) {
+      var copie = proaspat.clone();
+      caches.open(CACHE).then(function (c) { c.put(cerere, copie); });
+      return proaspat;
+    }).catch(function () { return raspuns; });
+    return raspuns || deLaRetea;
+  });
+}
+
 self.addEventListener('fetch', function (e) {
   var u = new URL(e.request.url);
   // Apps Script și fonturile Google trec direct, neatinse.
   if (u.origin !== location.origin || e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then(function (raspuns) {
-      return raspuns || fetch(e.request).then(function (proaspat) {
-        var copie = proaspat.clone();
-        caches.open(CACHE).then(function (c) { c.put(e.request, copie); });
-        return proaspat;
-      }).catch(function () { return caches.match('./index.html'); });
-    })
-  );
+
+  var estePagina = e.request.mode === 'navigate' ||
+                   u.pathname === '/' || /\/(index\.html)?$/.test(u.pathname);
+  e.respondWith(estePagina ? retiaIntai(e.request) : memorieApoiRetea(e.request));
 });
