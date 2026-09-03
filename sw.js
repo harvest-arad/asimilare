@@ -15,6 +15,10 @@
  * Datele NU se cachează niciodată: sunt de pe alt domeniu (Apps Script) și
  * n-are rost să arate confirmări de ieri.
  */
+// `cache: 'reload'` / `'no-cache'` ocolesc cache-ul HTTP al browserului. Fără
+// ele, GitHub Pages dă fișierele cu `max-age`, iar service worker-ul nou își
+// umple memoria cu pagina expirată — arată versiune nouă de service worker și
+// conținut vechi, ceea ce e mai rău decât să nu se fi actualizat deloc.
 var VERSIUNE = '742c84dc726b';
 var CACHE = 'asimilare-' + VERSIUNE;
 var COAJA = ['./', './index.html', './manifest.webmanifest', './icon.png'];
@@ -22,7 +26,11 @@ var COAJA = ['./', './index.html', './manifest.webmanifest', './icon.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE)
-      .then(function (c) { return c.addAll(COAJA); })
+      .then(function (c) {
+        return c.addAll(COAJA.map(function (u) {
+          return new Request(u, { cache: 'reload' });
+        }));
+      })
       .then(function () { return self.skipWaiting(); })
   );
 });
@@ -38,7 +46,7 @@ self.addEventListener('activate', function (e) {
 
 /** Pagina: rețeaua întâi, memoria doar dacă nu se poate. */
 function retiaIntai(cerere) {
-  return fetch(cerere).then(function (proaspat) {
+  return fetch(new Request(cerere.url, { cache: 'no-cache' })).then(function (proaspat) {
     var copie = proaspat.clone();
     caches.open(CACHE).then(function (c) { c.put(cerere, copie); });
     return proaspat;
@@ -50,7 +58,7 @@ function retiaIntai(cerere) {
 /** Restul cojii: din memorie, dar o împrospătăm în fundal pentru data viitoare. */
 function memorieApoiRetea(cerere) {
   return caches.match(cerere).then(function (raspuns) {
-    var deLaRetea = fetch(cerere).then(function (proaspat) {
+    var deLaRetea = fetch(new Request(cerere.url, { cache: 'no-cache' })).then(function (proaspat) {
       var copie = proaspat.clone();
       caches.open(CACHE).then(function (c) { c.put(cerere, copie); });
       return proaspat;
