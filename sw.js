@@ -19,7 +19,7 @@
 // ele, GitHub Pages dă fișierele cu `max-age`, iar service worker-ul nou își
 // umple memoria cu pagina expirată — arată versiune nouă de service worker și
 // conținut vechi, ceea ce e mai rău decât să nu se fi actualizat deloc.
-var VERSIUNE = '0a550560207a';
+var VERSIUNE = '444447a1fbf5';
 var CACHE = 'asimilare-' + VERSIUNE;
 var COAJA = ['./', './index.html', './manifest.webmanifest', './icon.png'];
 

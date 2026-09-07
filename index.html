@@ -1447,7 +1447,10 @@
             fisaAnunt(m, tinta, text, ramane);
           })
           .withFailureHandler(function (er) {
-            toast(String(er && er.message ? er.message : 'Nu s-a putut muta'));
+            // Apps Script pune „Error: " în fața a ce arunci. Într-un mesaj
+            // românesc nu spune nimic — îl scoatem.
+            toast(String(er && er.message ? er.message : '')
+              .replace(/^Error:\s*/, '') || 'Nu s-a putut muta');
             b.disabled = false;
           })
           .mutaMembru(m.id, idT, dep, ramane, D.data, D.echipa.id);
