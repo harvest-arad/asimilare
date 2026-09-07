@@ -259,6 +259,14 @@
 
   .field { display: block; margin: 0 0 0.7rem; }
 
+  .nota { margin: 0.6rem 0 0; font-size: 0.78rem; line-height: 1.5; color: var(--ink-mute); }
+
+  .previzualizare {
+    margin: 0.7rem 0 0; padding: 0.7rem 0.8rem; border-radius: 0.45rem;
+    border: 1px solid var(--line); background: var(--ground);
+    font-size: 0.85rem; line-height: 1.55; white-space: pre-wrap;
+  }
+
   .field > span {
     display: block; font-family: var(--font-display); font-weight: 700;
     font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase;
@@ -286,6 +294,28 @@
   .comutator:has(input:checked) { border-color: var(--gold); }
   .comutator:has(input:disabled) { opacity: 0.65; cursor: default; }
   .comutator:has(input:focus-visible) { outline: 3px solid var(--gold); outline-offset: 1px; }
+
+  /* Anunțul de mutare. Stă peste tot, sub antet, până îl închide cineva —
+     nu într-un tab, fiindcă un coordonator care nu intră la „Echipa" ar afla
+     că i-a venit un om abia când l-ar vedea duminică la ușă. */
+  .mutari { max-width: 34rem; margin: 0 auto; padding: 0.7rem 1.1rem 0; }
+
+  .mutare {
+    display: flex; align-items: flex-start; gap: 0.7rem;
+    border: 1px solid var(--gold); border-left-width: 3px;
+    border-radius: 0.45rem; background: var(--ground);
+    padding: 0.65rem 0.7rem 0.65rem 0.8rem; margin-bottom: 0.5rem;
+  }
+
+  .mutare div { flex: 1 1 auto; min-width: 0; }
+  .mutare b { display: block; font-weight: 600; font-size: 0.9rem; }
+  .mutare small { display: block; color: var(--ink-mute); font-size: 0.74rem; line-height: 1.45; margin-top: 0.1rem; }
+  .mutare .btn { margin-top: 0.5rem; }
+
+  .mutare-x {
+    flex: none; border: 0; background: none; cursor: pointer; padding: 0.1rem 0.25rem;
+    color: var(--ink-mute); font-size: 1.1rem; line-height: 1;
+  }
 
   .scrim { position: fixed; inset: 0; z-index: 50; background: var(--scrim); display: flex; align-items: flex-end; justify-content: center; }
 
@@ -376,6 +406,8 @@
   </div>
 </header>
 
+<div class="mutari" id="mutari"></div>
+
 <div class="shell">
   <section class="panel" data-panel="send"></section>
   <section class="panel" data-panel="sunday" hidden></section>
@@ -460,7 +492,11 @@
       return { id: id, r: r, inlocuitor: inlocuitor, d: d, e: e };
     },
     salveazaMembru: function (m, d, e) { return { obiect: JSON.stringify(m), d: d, e: e }; },
-    adaugaMembru:   function (m, d, e) { return { obiect: JSON.stringify(m), d: d, e: e }; }
+    adaugaMembru:   function (m, d, e) { return { obiect: JSON.stringify(m), d: d, e: e }; },
+    mutaMembru:     function (id, spre, dep, si, d, e) {
+      return { id: id, spre: spre, dep: dep, si: si ? 'true' : '', d: d, e: e };
+    },
+    inchideMutarea: function (rand, d, e) { return { rand: rand, d: d, e: e }; }
   };
 
   function cheama(metoda, argumente) {
@@ -692,7 +728,8 @@
     // nimeni n-a răspuns încă, sau abia unul-doi: cererea inițială
     if (cineva === 0) {
       return 'Salut! ' + Z.charAt(0).toUpperCase() + Z.slice(1) +
-        ' e rândul echipei noastre. Confirmați-mi vă rog aici, durează cinci secunde:' +
+        ' e rândul echipei noastre. Confirmați-mi vă rog aici — prima dată vă cere ' +
+        'numărul de telefon, ca să știe cine sunteți:' +
         NL + D.linkGrup + NL + NL +
         'Dacă nu puteți, tot de acolo îmi spuneți — și dacă ați găsit pe cineva ' +
         'să vă înlocuiască. Mulțumesc! ' + D.echipa.coordonator;
@@ -727,8 +764,10 @@
         (fara === total ? 'Copiază mesajul pentru grup' : 'Copiază reminderul pentru grup') +
       '</button></div>' +
       '<p class="footnote" style="margin-top:0.7rem;padding-bottom:0">' +
-      'Îl lipești în grupul de WhatsApp al echipei. Fiecare își atinge numele și confirmă — ' +
-      'telefonul îl ține minte pentru duminicile următoare.</p>' +
+      'Îl lipești în grupul de WhatsApp al echipei. Prima dată fiecare își scrie ' +
+      'numărul de telefon — după aceea telefonul îl ține minte și confirmarea e o ' +
+      'singură atingere. Cine nu e în lista echipei nu poate confirma, oricât ar ' +
+      'fi rămas în grup.</p>' +
       '</div></div>';
   }
 
@@ -1209,6 +1248,12 @@
           'Primește un link propriu, care se leagă de telefonul lui.') +
       '</small></span></label>';
 
+    // Mutarea e altceva decât scoaterea: omul nu pleacă din lucrare, ci în
+    // altă echipă. De-aia stă separat, deasupra, nu lângă butonul roșu.
+    var mutare = (m.stare === 'activ' && D.poateMuta && (D.echipeTinta || []).length)
+      ? '<div class="bulk"><button class="btn" data-act="muta">Mută în altă echipă</button></div>'
+      : '';
+
     var actiuni = m.stare === 'activ'
       ? '<label class="field"><span>Motivul pauzei (opțional)</span><input id="fPauza" placeholder="ex. concediu până în octombrie"></label>' +
         '<div class="bulk"><button class="btn" data-act="pauza">Pune pe pauză</button>' +
@@ -1231,7 +1276,8 @@
         esc(rolCu(m.rol, false)) + '" placeholder="ex. sunet, primire"></label>' +
       comutator + linkCoord +
       '<label class="field"><span>Familie</span><input id="fF" value="' + esc(m.familie) + '" placeholder="ex. Ciba — aceeași etichetă la toți din familie"></label>' +
-      '<div class="bulk"><button class="btn btn-primary" data-act="salveaza">Salvează</button></div>' + actiuni +
+      '<div class="bulk"><button class="btn btn-primary" data-act="salveaza">Salvează</button></div>' +
+      mutare + actiuni +
       '</div>',
       function (ev) {
         if (ev.target.closest('[data-copiaza]')) {
@@ -1241,6 +1287,7 @@
         var b = ev.target.closest('[data-act]');
         if (!b) return;
         var k = b.getAttribute('data-act');
+        if (k === 'muta') { fisaMutare(m.id); return; }
         var date = {
           id: m.id, nume: m.nume, telefon: m.telefon, email: m.email,
           departament: m.departament, rol: m.rol, familie: m.familie,
@@ -1306,6 +1353,166 @@
         toast('Salvat');
       });
   }
+
+  // ── Mutarea dintr-o echipă în alta ──────────────────────
+
+  function cuSeful(nume, coord) {
+    if (!coord || nume.indexOf(coord) >= 0) return nume;
+    return nume + ' (' + coord + ')';
+  }
+
+  function echipaTinta(id) {
+    return (D.echipeTinta || []).filter(function (t) { return t.id === id; })[0];
+  }
+
+  /**
+   * Textul pentru celălalt coordonator. Îl construim înainte de mutare: după,
+   * omul nu mai e în lista din care l-am luat.
+   */
+  function mesajMutare(m, tinta, dep, ramane) {
+    var cine = (tinta.coordonator || 'Salut').split(' ')[0];
+    return 'Salut, ' + cine + '! ' + m.nume +
+      (ramane
+        ? ' slujește de acum și la voi, la ' + dep + ', pe lângă echipa ' + D.echipa.nume + '.'
+        : ' s-a mutat de la echipa ' + D.echipa.nume + ' la voi, la ' + dep + '.') +
+      ' E deja în lista ta din aplicație.' +
+      (m.telefon ? ' Numărul: ' + m.telefon + '.' : '');
+  }
+
+  function fisaMutare(id) {
+    var m = byId(id);
+    var tinte = D.echipeTinta || [];
+    if (!tinte.length) { toast('Nu mai e altă echipă pornită'); return; }
+
+    function optiuniDep(t) {
+      return t.departamente.map(function (d) {
+        return '<option' + (d === m.departament ? ' selected' : '') + '>' + esc(d) + '</option>';
+      }).join('');
+    }
+
+    deschide(
+      '<div class="sheet-head"><div><h2>Mută pe ' + esc(m.prenume) + '</h2>' +
+      '<p>Acum la ' + esc(D.echipa.nume) + ' · ' + esc(m.departament) + '</p></div>' +
+      '<button class="sheet-close" data-close="1">Închide</button></div>' +
+      '<div class="sheet-body">' +
+      '<label class="field"><span>În echipa</span><select id="muE">' +
+        tinte.map(function (t) {
+          return '<option value="' + esc(t.id) + '">' + esc(cuSeful(t.nume, t.coordonator)) +
+            '</option>';
+        }).join('') +
+      '</select></label>' +
+      '<label class="field"><span>Acolo, la</span><select id="muD">' + optiuniDep(tinte[0]) + '</select></label>' +
+      '<label class="comutator"><input type="checkbox" id="muSi">' +
+      '<span><b>Rămâne și la noi</b><small>Pentru cine slujește în două echipe — ' +
+      'unul la parcare, altul în sală. Primește un rând separat acolo, cu ' +
+      'duminicile și confirmările lui.</small></span></label>' +
+      (m.linkAdmin
+        ? '<p class="nota">Are acces de coordonator la echipa asta. După mutare nu-l mai are — ' +
+          'coordonatorul de acolo i-l poate da din nou, la el în echipă.</p>'
+        : '') +
+      '<p class="nota" id="muNota"></p>' +
+      '<div class="bulk"><button class="btn btn-primary" data-act="muta">Mută</button></div>' +
+      '</div>',
+      function (ev) {
+        var b = ev.target.closest('[data-act]');
+        if (!b) return;
+        var idT = document.getElementById('muE').value;
+        var dep = document.getElementById('muD').value;
+        var ramane = document.getElementById('muSi').checked;
+        var tinta = echipaTinta(idT);
+        if (!tinta) { toast('Alege echipa'); return; }
+        var text = mesajMutare(m, tinta, dep, ramane);
+        b.disabled = true;
+        google.script.run
+          .withSuccessHandler(function (nou) {
+            aplica(nou); randeaza();
+            fisaAnunt(m, tinta, text, ramane);
+          })
+          .withFailureHandler(function (er) {
+            toast(String(er && er.message ? er.message : 'Nu s-a putut muta'));
+            b.disabled = false;
+          })
+          .mutaMembru(m.id, idT, dep, ramane, D.data, D.echipa.id);
+      });
+
+    // Fiecare echipă are alte departamente: Welcome are parcare și sală,
+    // cafeneaua n-are. Le schimbăm odată cu echipa aleasă.
+    var selE = document.getElementById('muE');
+    var selD = document.getElementById('muD');
+    var nota = document.getElementById('muNota');
+
+    function potriveste() {
+      var t = echipaTinta(selE.value);
+      if (!t) return;
+      selD.innerHTML = optiuniDep(t);
+      nota.textContent = document.getElementById('muSi').checked
+        ? 'Rămâne în lista ta și intră și în a lui ' + (t.coordonator || t.nume) + '.'
+        : 'Iese din lista ta și intră în a lui ' + (t.coordonator || t.nume) +
+          '. Linkul lui personal rămâne același, doar că arată echipa nouă.';
+    }
+
+    selE.addEventListener('change', potriveste);
+    document.getElementById('muSi').addEventListener('change', potriveste);
+    potriveste();
+  }
+
+  /** După mutare: mesajul gata scris pentru coordonatorul care primește omul. */
+  function fisaAnunt(m, tinta, text, ramane) {
+    var tel = telIntl(tinta.telefonCoordonator || '');
+    deschide(
+      '<div class="sheet-head"><div><h2>Gata</h2><p>' + esc(m.nume) +
+      (ramane ? ' slujește acum și la ' : ' e acum la ') + esc(tinta.nume) + '</p></div>' +
+      '<button class="sheet-close" data-close="1">Închide</button></div>' +
+      '<div class="sheet-body">' +
+      '<p class="nota">' + esc(tinta.coordonator || 'Coordonatorul de acolo') +
+      ' vede anunțul în aplicație la următoarea deschidere. Dacă vrei să afle acum:</p>' +
+      '<div class="previzualizare">' + esc(text) + '</div>' +
+      '<div class="bulk"><button class="btn" data-act="copiaza">Copiază textul</button>' +
+      (tel
+        ? '<a class="btn btn-primary" target="_blank" rel="noopener" href="https://wa.me/' + tel +
+          '?text=' + encodeURIComponent(text) + '">Trimite pe WhatsApp</a>'
+        : '') +
+      '</div></div>',
+      function (ev) {
+        if (ev.target.closest('[data-act="copiaza"]')) copiaza(text, 'Copiat');
+      });
+  }
+
+  // ── Anunțurile de mutare ────────────────────────────────
+
+  /**
+   * Stau sub antet, peste toate taburile, până le închide cineva. Nu într-un
+   * tab: un coordonator care nu intră la „Echipa" ar afla că i-a venit un om
+   * abia duminică, la ușă.
+   */
+  function renderMutari() {
+    var host = document.getElementById('mutari');
+    host.innerHTML = (D.mutari || []).map(function (x) {
+      var titlu = x.incoace
+        ? x.nume + (x.fel === 'si' ? ' slujește de acum și la voi' : ' a venit în echipă')
+        : x.nume + (x.fel === 'si' ? ' slujește de acum și la ' + x.catre : ' a plecat din echipă');
+      var unde = x.incoace
+        ? 'din echipa ' + cuSeful(x.din, x.dinCoordonator)
+        : 'la echipa ' + cuSeful(x.catre, x.catreCoordonator);
+      return '<div class="mutare"><div><b>' + esc(titlu) + '</b><small>' + esc(unde) +
+        ' · ' + esc(x.data) + (x.deCatre ? ' · ' + esc(x.deCatre) : '') + '</small></div>' +
+        '<button class="mutare-x" data-mutare="' + esc(x.rand) + '" aria-label="Am văzut">&times;</button></div>';
+    }).join('');
+  }
+
+  document.getElementById('mutari').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-mutare]');
+    if (!b) return;
+    var rand = b.getAttribute('data-mutare');
+    // Dispare pe loc; dacă serverul refuză, reapare la următoarea încărcare.
+    D.mutari = (D.mutari || []).filter(function (x) { return String(x.rand) !== String(rand); });
+    renderMutari();
+    google.script.run
+      .withSuccessHandler(function (nou) { aplica(nou); randeaza(); })
+      .withFailureHandler(function () { /* rămâne închis până la reîncărcare */ })
+      .inchideMutarea(rand, D.data, D.echipa.id);
+  });
+
 
   function fisaAdaugare() {
     deschide(
@@ -1667,6 +1874,7 @@
       '<i data-k="covered" style="width:' + (c.covered / t * 100) + '%"></i>' +
       '<i data-k="gap" style="width:' + (c.gap / t * 100) + '%"></i>';
 
+    renderMutari();
     renderSend(); renderSunday(); renderTeam(); renderDates();
   }
 
