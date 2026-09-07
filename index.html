@@ -1142,6 +1142,20 @@
             'să-l pui pe pauză sau să-l scoți din echipă.</p>' +
             '<div class="bulk"><button class="btn btn-primary" data-add="1">Adaugă membru</button></div>';
 
+    // Numărul e cheia cu care se intră din linkul de grup. Cine n-are unul nu
+    // poate confirma singur — și n-ar afla de ce. Îi numim, ca să se poată
+    // rezolva: ori le treci tu numărul, ori și-l scriu ei la poartă.
+    var fara = D.membri.filter(function (m) {
+      return m.stare === 'activ' && String(m.telefon || '').replace(/[^0-9]/g, '').length < 9;
+    });
+    if (fara.length) {
+      h += '<p class="lede" style="color:var(--gold)">' +
+        (fara.length === 1 ? '<b>' + esc(fara[0].nume) + '</b> n-are număr în listă'
+                           : '<b>' + fara.length + ' oameni</b> n-au număr în listă: ' +
+                             esc(fara.map(function (m) { return m.prenume; }).join(', '))) +
+        '. Din linkul de grup își pot scrie singuri numărul, o dată — sau îl treci tu aici.</p>';
+    }
+
     DEPTS().forEach(function (dep) {
       var lot = D.membri.filter(function (m) { return m.stare === 'activ' && m.departament === dep; });
       if (!lot.length) return;
@@ -1210,8 +1224,12 @@
     var m = byId(id);
     var tel = telIntl(m.telefon);
 
+    // Cine și-a scris singur numărul la poarta linkului de grup. Coordonatorul
+    // vede de unde a apărut, nu doar că a apărut.
+    var deUnde = m.telefonDin ? 'și l-a scris el, ' + esc(m.telefonDin) : 'sună';
+
     var contacte = (m.telefon
-        ? '<a class="contact" href="tel:+' + tel + '"><b>' + esc(m.telefon) + '</b><span>sună</span></a>' +
+        ? '<a class="contact" href="tel:+' + tel + '"><b>' + esc(m.telefon) + '</b><span>' + deUnde + '</span></a>' +
           '<a class="contact" href="https://wa.me/' + tel + '" target="_blank" rel="noopener"><b>WhatsApp</b><span>conversație</span></a>'
         : '') +
       (m.email ? '<a class="contact" href="mailto:' + esc(m.email) + '"><b>' + esc(m.email) + '</b><span>email</span></a>' : '') +
