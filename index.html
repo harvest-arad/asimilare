@@ -360,6 +360,16 @@
     opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
   }
 
+  /* Când pornim din instantaneu, nu mai punem poarta peste tot ecranul —
+     doar o dungă care spune că numerele de pe ecran se verifică. */
+  .prospetire {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    background: var(--gold); color: var(--on-gold);
+    font-family: var(--font-display); font-weight: 800;
+    font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase;
+    text-align: center; padding: 0.4rem 1rem;
+  }
+
   .poarta {
     position: fixed; inset: 0; z-index: 50;
     background: var(--ground); display: grid; place-items: center;
@@ -425,10 +435,44 @@
   </div>
 </div>
 
+<div class="prospetire" id="prospetire" hidden>Se actualizează…</div>
+
 <script>
   var API = 'https://script.google.com/macros/s/AKfycbwR4hgy9L7wIfbxTOqqlUJvj7kJJE6WjsGwCXK3I9rNQqr5jkaMxxS25hnsQowqxqE/exec';
   var CHEIE = 'asimilare.token';
   var CHEIE_APARAT = 'asimilare.aparat';
+  var CHEIE_ULTIM = 'asimilare.ultim';
+
+  /**
+   * Ultimul răspuns bun, ținut în telefon.
+   *
+   * Apps Script răspunde când în 3 secunde, când în 30 — aceeași muncă, aceeași
+   * zi. Măsurat: 3, 8, 11, 31, 49, 125 de secunde. N-avem ce optimiza pe server
+   * ca să scăpăm de asta, fiindcă nu vine de la noi.
+   *
+   * Așa că pornirea nu mai așteaptă rețeaua: desenăm ce era ultima dată, pe
+   * loc, și înlocuim când vin datele noi. Vechi de câteva ore înseamnă, în cel
+   * mai rău caz, câteva confirmări lipsă pe ecran, timp de o secundă — nu o
+   * pagină goală timp de un minut.
+   */
+  var VECHIME_MAXIMA = 12 * 60 * 60 * 1000;   // peste atât, mai bine aștepți
+
+  function tineUltimul(d) {
+    try {
+      localStorage.setItem(CHEIE_ULTIM, JSON.stringify({ cand: Date.now(), date: d }));
+    } catch (e) { /* mod privat, sau plin: mergem fără */ }
+  }
+
+  function ultimul() {
+    try {
+      var brut = localStorage.getItem(CHEIE_ULTIM);
+      if (!brut) return null;
+      var x = JSON.parse(brut);
+      if (!x || !x.date || !x.date.membri) return null;
+      if (Date.now() - (x.cand || 0) > VECHIME_MAXIMA) return null;
+      return x.date;
+    } catch (e) { return null; }
+  }
 
   var D = null;
 
@@ -512,6 +556,10 @@
       .then(function (r) { return r.json(); })
       .then(function (j) {
         if (!j.ok) throw new Error(j.eroare || 'Eroare necunoscută');
+        // Numai `stare` — el e răspunsul pe care îl cere și pornirea. Un
+        // instantaneu de la altă echipă sau altă zi ar deschide aplicația în
+        // altă parte decât o duce reîncărcarea.
+        if (par.api === 'stare' && !par.e && !par.d) tineUltimul(j.date);
         return j.date;
       });
   }
@@ -590,6 +638,18 @@
   }
 
   /**
+   * Ziua, îngroșată pentru WhatsApp, pe rândul ei.
+   *
+   * WhatsApp nu are mărimi de literă — `*asta*` e tot ce se poate. Ce mai poate
+   * face un rând singur: scoate data din mijlocul propoziției, unde se citea
+   * peste. Prima literă mare, fiindcă începe rândul.
+   */
+  function ziuaIngrosata() {
+    var z = ziuaText();
+    return '*' + z.charAt(0).toUpperCase() + z.slice(1) + '*';
+  }
+
+  /**
    * Slujirea nu e totdeauna duminica: mai e Joia Mare, Vinerea Mare, Paștele,
    * Crăciunul, Anul Nou. Titlul ia numele zilei din date, nu îl presupune.
    */
@@ -644,13 +704,17 @@
 
   function mesaj(m, reminder) {
     if (reminder) {
-      return 'Salut, ' + m.prenume + '! Revin cu rugămintea să-mi confirmi pentru ' +
-        ziuaText() + '. E de ajuns o atingere:\n' + m.link + '\n\nMulțumesc! ' + D.echipa.coordonator;
+      return 'Salut, ' + m.prenume + '! Revin cu rugămintea să-mi confirmi pentru' +
+        NL + NL + ziuaIngrosata() + NL + NL +
+        'E de ajuns o atingere:' + NL + m.link + NL + NL +
+        'Mulțumesc! ' + D.echipa.coordonator;
     }
-    var Z = ziuaText();
-    return 'Salut, ' + m.prenume + '! ' + Z.charAt(0).toUpperCase() + Z.slice(1) +
-      ', ești programat(ă) la ' + m.departament.toLowerCase() + (m.rol ? ' — ' + m.rol : '') + '.\n\n' +
-      'Confirmă-mi te rog dacă vii, dintr-o atingere:\n' + m.link + '\n\n' +
+    // La mulți, postul și departamentul sunt același cuvânt („parcare — parcare").
+    var unde = m.departament.toLowerCase();
+    if (m.rol && m.rol.toLowerCase() !== unde) unde += ' — ' + m.rol;
+    return 'Salut, ' + m.prenume + '! Ești programat(ă) la ' + unde + ':' + NL + NL +
+      ziuaIngrosata() + NL + NL +
+      'Confirmă-mi te rog dacă vii, dintr-o atingere:' + NL + m.link + NL + NL +
       'Dacă nu poți, tot de acolo îmi spui și dacă ai găsit pe cineva să te înlocuiască. Mulțumesc! ' +
       D.echipa.coordonator;
   }
@@ -719,17 +783,17 @@
     });
     var total = deTrimis().length;
     var cineva = total - fara.length;
-    var Z = ziuaText();
 
     if (!fara.length) {
-      return 'Au confirmat toți pentru ' + Z + '. Mulțumesc!' + NL + D.echipa.coordonator;
+      return 'Au confirmat toți pentru ' + ziuaIngrosata() + '. Mulțumesc!' +
+        NL + D.echipa.coordonator;
     }
 
     // nimeni n-a răspuns încă, sau abia unul-doi: cererea inițială
     if (cineva === 0) {
-      return 'Salut! ' + Z.charAt(0).toUpperCase() + Z.slice(1) +
-        ' e rândul echipei noastre. Confirmați-mi vă rog aici — prima dată vă cere ' +
-        'numărul de telefon, ca să știe cine sunteți:' +
+      return 'Salut! E rândul echipei noastre:' + NL + NL +
+        ziuaIngrosata() + NL + NL +
+        'Confirmați-mi vă rog aici — vă atingeți numele în listă, atât:' +
         NL + D.linkGrup + NL + NL +
         'Dacă nu puteți, tot de acolo îmi spuneți — și dacă ați găsit pe cineva ' +
         'să vă înlocuiască. Mulțumesc! ' + D.echipa.coordonator;
@@ -737,14 +801,16 @@
 
     // mulți restanți: nu-i înșirăm, ar fi un perete de nume
     if (fara.length > MAX_NUME) {
-      return 'Am primit ' + cineva + ' confirmări din ' + total + ' pentru ' + Z +
-        '. Dacă n-ai apucat încă, e o singură atingere:' +
+      return 'Am primit ' + cineva + ' confirmări din ' + total + ' pentru' + NL + NL +
+        ziuaIngrosata() + NL + NL +
+        'Dacă n-ai apucat încă, e o singură atingere:' +
         NL + D.linkGrup + NL + NL + 'Mulțumesc! ' + D.echipa.coordonator;
     }
 
     // puțini: îi numim, e mai eficient
-    return 'Mai aștept răspuns de la ' + listaNume(fara) + ' pentru ' + Z +
-      '. E o singură atingere:' + NL + D.linkGrup + NL + NL +
+    return 'Mai aștept răspuns de la ' + listaNume(fara) + ' pentru' + NL + NL +
+      ziuaIngrosata() + NL + NL +
+      'E o singură atingere:' + NL + D.linkGrup + NL + NL +
       'Mulțumesc! ' + D.echipa.coordonator;
   }
 
@@ -764,10 +830,11 @@
         (fara === total ? 'Copiază mesajul pentru grup' : 'Copiază reminderul pentru grup') +
       '</button></div>' +
       '<p class="footnote" style="margin-top:0.7rem;padding-bottom:0">' +
-      'Îl lipești în grupul de WhatsApp al echipei. Prima dată fiecare își scrie ' +
-      'numărul de telefon — după aceea telefonul îl ține minte și confirmarea e o ' +
-      'singură atingere. Cine nu e în lista echipei nu poate confirma, oricât ar ' +
-      'fi rămas în grup.</p>' +
+      'Îl lipești în grupul de WhatsApp al echipei. Fiecare își atinge numele în ' +
+      'listă și confirmă — telefonul îl ține minte pentru duminicile următoare. ' +
+      'Cine nu se găsește în listă apasă „Nu sunt în listă", își scrie numărul, ' +
+      'și de acolo ori e recunoscut la echipa unde s-a mutat, ori primește un ' +
+      'mesaj gata scris pentru tine, ca să-l treci în listă.</p>' +
       '</div></div>';
   }
 
@@ -1917,14 +1984,32 @@
              false);
       return;
     }
-    poarta('Se încarcă…', 'Aducem datele echipei.', false);
+
+    // Dacă avem ce arăta, arătăm pe loc și verificăm în fundal.
+    var vechi = ultimul();
+    var dunga = document.getElementById('prospetire');
+    if (vechi) {
+      D = vechi;
+      document.getElementById('poarta').hidden = true;
+      randeaza();
+      dunga.hidden = false;
+    } else {
+      poarta('Se încarcă…', 'Aducem datele echipei.', false);
+    }
+
     cheama('stare', []).then(function (d) {
       D = d;
       document.getElementById('poarta').hidden = true;
+      dunga.hidden = true;
       randeaza();
     }, function (er) {
+      dunga.hidden = true;
       var mesaj = String(er.message || er);
       var aparat = mesaj.indexOf('alt telefon') >= 0;
+      // Cu date vechi pe ecran, o eroare de rețea nu trebuie să le acopere:
+      // ce se vede e mai bun decât nimic. Doar dacă linkul chiar nu mai merge
+      // punem poarta peste tot.
+      if (vechi && !aparat) { toast('N-am putut împrospăta. Ce vezi e de mai devreme.'); return; }
       poarta(aparat ? 'Linkul e legat de alt telefon' : 'N-am putut încărca',
              aparat ? mesaj
                     : (navigator.onLine ? mesaj
