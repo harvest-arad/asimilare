@@ -399,6 +399,13 @@
   .poarta .pasi li { margin-bottom: 0.45rem; }
   .poarta .mic { font-size: 0.78rem; margin: 1rem 0 0; }
 
+  .poarta .avert {
+    text-align: left; margin: 0 0 1rem; padding: 0.7rem 0.85rem;
+    border-radius: 0.5rem; border: 1px solid var(--gold);
+    background: rgba(245, 186, 0, 0.12);
+    font-size: 0.86rem; line-height: 1.5; color: var(--ink);
+  }
+
   .toast[data-show="true"] { opacity: 1; }
 
   @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
@@ -451,6 +458,9 @@
       <button class="btn btn-primary" id="linkBtn">Deschide</button>
     </div>
     <div id="poartaIos" hidden>
+      <p class="avert" id="iosChrome" hidden>Ești în Chrome. Pe iPhone aplicația se
+        instalează doar din <b>Safari</b> — copiază linkul de mai jos, deschide-l în
+        Safari, apoi urmează pașii. În Chrome nu apare „Adaugă la ecranul principal".</p>
       <ol class="pasi">
         <li>Apasă <b>Copiază linkul</b>, aici jos.</li>
         <li>Apasă butonul de partajare din Safari (pătratul cu săgeată în sus).</li>
@@ -2159,6 +2169,14 @@
              : 'Deschide întâi linkul primit de la coordonarea Asimilării, apoi urmează pașii.',
            false);
     document.getElementById('poartaIos').hidden = false;
+
+    // Pe iPhone doar Safari instalează o aplicație adevărată. Dacă omul e într-un
+    // browser cunoscut care nu poate (Chrome, Firefox, Edge, Opera), i-o spunem
+    // limpede — altfel caută „Adaugă la ecranul principal" și n-o găsește.
+    var ua = navigator.userAgent;
+    var altBrowser = /CriOS|FxiOS|EdgiOS|OPiOS|OPT\//.test(ua);
+    document.getElementById('iosChrome').hidden = !altBrowser;
+
     var b = document.getElementById('copiazaLink');
     b.hidden = !t;
     var link = location.origin + location.pathname + '?a=' + t;
