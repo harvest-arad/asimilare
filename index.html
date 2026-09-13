@@ -1434,10 +1434,14 @@
 
     // Pe propria cartelă comutatorul e blocat: altfel te-ai putea încuia singur
     // pe dinafară, cu un singur atins, fără drum înapoi din aplicație.
+    // Cine e coordonator — adică cine are aplicația — se hotărăște numai de
+    // coordonare (Valentin, Adi). Un coordonator obișnuit nu vede comutatorul,
+    // deci nu poate face pe altcineva coordonator și împărți aplicația.
     var euSunt = String(m.id) === String(D.vizitatorId);
-    var comutator =
+    var esteCoord = /coordonator/i.test(String(m.rol || ''));
+    var comutator = !D.esteAdmin ? '' :
       '<label class="comutator"><input type="checkbox" id="fCoord"' +
-      (m.linkAdmin ? ' checked' : '') + (euSunt ? ' disabled' : '') + '>' +
+      (esteCoord ? ' checked' : '') + (euSunt ? ' disabled' : '') + '>' +
       '<span><b>Poate vedea toată echipa</b><small>' +
       (euSunt
         ? 'Ăsta ești tu. Accesul tău se schimbă doar din foaie.'
@@ -1514,8 +1518,11 @@
           date.telefon = document.getElementById('fT').value.trim();
           date.email = document.getElementById('fE').value.trim();
           date.departament = document.getElementById('fD').value;
-          var vreaCoord = document.getElementById('fCoord').checked;
-          date.rol = rolCu(document.getElementById('fR').value.trim(), vreaCoord);
+          // Comutatorul există doar pentru admini. Fără el, rolul rămâne cum e:
+          // un coordonator obișnuit nu schimbă statutul nimănui.
+          var cb = document.getElementById('fCoord');
+          date.rol = cb ? rolCu(document.getElementById('fR').value.trim(), cb.checked)
+                        : document.getElementById('fR').value.trim();
           date.familie = document.getElementById('fF').value.trim();
         } else if (k === 'pauza') {
           date.stare = 'pauza';
