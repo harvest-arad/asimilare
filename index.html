@@ -385,6 +385,20 @@
 
   .poarta p { margin: 0 0 1.4rem; color: var(--ink-soft); font-size: 0.95rem; }
 
+  .poarta .lipit {
+    display: block; width: 100%; box-sizing: border-box; margin: 0 0 0.7rem;
+    padding: 0.8rem 0.9rem; border-radius: 0.5rem; font-size: 0.95rem;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  }
+
+  .poarta .pasi {
+    text-align: left; margin: 0 0 1.2rem; padding-left: 1.3rem;
+    color: var(--ink-soft); font-size: 0.92rem; line-height: 1.55;
+  }
+
+  .poarta .pasi li { margin-bottom: 0.45rem; }
+  .poarta .mic { font-size: 0.78rem; margin: 1rem 0 0; }
+
   .toast[data-show="true"] { opacity: 1; }
 
   @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
@@ -431,6 +445,21 @@
   <div class="poarta-cutie">
     <h1 id="poartaTitlu">Se încarcă…</h1>
     <p id="poartaText">Aducem datele echipei.</p>
+    <div id="poartaLink" hidden>
+      <input class="lipit" id="linkLipit" type="url" inputmode="url" autocomplete="off"
+             autocapitalize="off" spellcheck="false" placeholder="Lipește aici linkul primit">
+      <button class="btn btn-primary" id="linkBtn">Deschide</button>
+    </div>
+    <div id="poartaIos" hidden>
+      <ol class="pasi">
+        <li>Apasă <b>Copiază linkul</b>, aici jos.</li>
+        <li>Apasă butonul de partajare din Safari (pătratul cu săgeată în sus).</li>
+        <li>Alege <b>Adaugă la ecranul principal</b>.</li>
+        <li>Deschide <b>Asimilare</b> de pe ecran. Dacă îți cere linkul, ține apăsat în căsuță și alege <b>Lipește</b>.</li>
+      </ol>
+      <button class="btn btn-primary" id="copiazaLink">Copiază linkul</button>
+      <p class="mic">Nu vezi „Adaugă la ecranul principal"? Linkul s-a deschis în WhatsApp, nu în Safari — alege întâi <b>Deschide în Safari</b>.</p>
+    </div>
     <button class="btn btn-primary" id="poartaBtn" hidden>Încearcă din nou</button>
   </div>
 </div>
@@ -444,6 +473,26 @@
   var CHEIE_ULTIM = 'asimilare.ultim';
 
   /**
+   * iPhone, dar nu din aplicația instalată.
+   *
+   * Pe iPhone, aplicația de pe ecranul principal are **altă memorie decât
+   * Safari** — și altă decât browserul din WhatsApp. Ce se ține minte într-una
+   * nu se vede în cealaltă. Vechiul drum („deschide linkul, apoi adaugă pe
+   * ecran") lega linkul de Safari la prima deschidere, iar aplicația instalată
+   * pornea goală, cu alt identificator, și era refuzată ca „alt telefon".
+   * Vlad a pățit-o pe 6 septembrie.
+   *
+   * Așa că pe iPhone, în afara aplicației instalate, nu legăm nimic și nu
+   * arătăm date: arătăm doar pașii de instalare. Legarea se face abia din
+   * aplicația de pe ecran — cea pe care omul o va folosi de-adevăratelea.
+   */
+  var ESTE_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var ESTE_INSTALATA = window.navigator.standalone === true ||
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  var DOAR_INSTALARE = ESTE_IOS && !ESTE_INSTALATA;
+
+  /**
    * Ultimul răspuns bun, ținut în telefon.
    *
    * Apps Script răspunde când în 3 secunde, când în 30 — aceeași muncă, aceeași
@@ -455,7 +504,11 @@
    * mai rău caz, câteva confirmări lipsă pe ecran, timp de o secundă — nu o
    * pagină goală timp de un minut.
    */
-  var VECHIME_MAXIMA = 12 * 60 * 60 * 1000;   // peste atât, mai bine aștepți
+  // Prima variantă avea 12 ore. Peste noapte trecea de ele, și dimineața
+  // aplicația aștepta iar Apps Script-ul — exact deschiderea care contează.
+  // Datele echipei se schimbă în zile, nu în ore; iar pe ecran scrie de când
+  // sunt, deci nimeni nu le ia drept proaspete.
+  var VECHIME_MAXIMA = 14 * 24 * 60 * 60 * 1000;
 
   function tineUltimul(d) {
     try {
@@ -470,7 +523,7 @@
       var x = JSON.parse(brut);
       if (!x || !x.date || !x.date.membri) return null;
       if (Date.now() - (x.cand || 0) > VECHIME_MAXIMA) return null;
-      return x.date;
+      return x;
     } catch (e) { return null; }
   }
 
@@ -489,7 +542,9 @@
     var dinAdresa = new URLSearchParams(location.search).get('a');
     if (dinAdresa) {
       try { localStorage.setItem(CHEIE, dinAdresa); } catch (e) { /* mod privat */ }
-      history.replaceState(null, '', location.pathname);
+      // Pe iPhone neinstalat îl lăsăm în adresă: dacă „Adaugă la ecranul
+      // principal" ia adresa curentă, aplicația pornește direct cu el.
+      if (!DOAR_INSTALARE) history.replaceState(null, '', location.pathname);
       return (_token = dinAdresa);
     }
     // Îl ținem și în memorie, nu doar în telefon: dacă browserul refuză
@@ -509,6 +564,8 @@
    * doua deschidere, fiindcă n-ar avea de unde să-și amintească cine e.
    */
   function aparatul() {
+    // Pe iPhone neinstalat nu legăm: memoria asta nu e a aplicației de pe ecran.
+    if (DOAR_INSTALARE) return '';
     try {
       var a = localStorage.getItem(CHEIE_APARAT);
       if (!a) {
@@ -540,7 +597,8 @@
     mutaMembru:     function (id, spre, dep, si, d, e) {
       return { id: id, spre: spre, dep: dep, si: si ? 'true' : '', d: d, e: e };
     },
-    inchideMutarea: function (rand, d, e) { return { rand: rand, d: d, e: e }; }
+    inchideMutarea: function (rand, d, e) { return { rand: rand, d: d, e: e }; },
+    dezleagaMembru: function (id, e) { return { id: id, e: e }; }
   };
 
   function cheama(metoda, argumente) {
@@ -556,10 +614,12 @@
       .then(function (r) { return r.json(); })
       .then(function (j) {
         if (!j.ok) throw new Error(j.eroare || 'Eroare necunoscută');
-        // Numai `stare` — el e răspunsul pe care îl cere și pornirea. Un
-        // instantaneu de la altă echipă sau altă zi ar deschide aplicația în
-        // altă parte decât o duce reîncărcarea.
-        if (par.api === 'stare' && !par.e && !par.d) tineUltimul(j.date);
+        // Orice răspuns cu echipa întreagă e un instantaneu bun, nu doar cel
+        // de la pornire: altfel, cine lucrează ore întregi în aplicație și o
+        // redeschide a doua zi ar vedea tot starea de la prima deschidere.
+        // Pornirea reîncarcă apoi exact echipa din instantaneu, deci ecranul nu
+        // mai sare dintr-o echipă în alta.
+        if (j.date && j.date.membri && j.date.echipa) tineUltimul(j.date);
         return j.date;
       });
   }
@@ -1287,6 +1347,60 @@
     window.prompt('Copiază linkul de aici:', text);
   }
 
+  /** Ziua următoarei slujiri a echipei, nu a zilei deschise acum pe ecran. */
+  function ziuaTintaIngrosata() {
+    var x = (D.dateleMele || []).filter(function (z) { return z.data === D.dataTinta; })[0];
+    if (!x) return ziuaIngrosata();
+    var t = x.text + (x.eveniment ? ' — ' + x.eveniment : '');
+    return '*' + t.charAt(0).toUpperCase() + t.slice(1) + '*';
+  }
+
+  /**
+   * Invitația pentru un coordonator nou: ce e, cum se instalează, linkul lui.
+   *
+   * Pașii de iPhone sunt aici dinadins, în mesaj, nu doar în aplicație: pe
+   * iPhone aplicația de pe ecran are altă memorie decât Safari, iar cine
+   * „doar deschidea linkul" rămânea legat de Safari și era refuzat din
+   * aplicația instalată. Așa a pățit Vlad pe 6 septembrie.
+   */
+  function invitatieCoordonator(m) {
+    var numeEchipa = D.echipa.nume;
+    var aLui = [m.prenume, m.numeFamilie].some(function (x) {
+      return x && numeEchipa.indexOf(x) >= 0;
+    });
+    var semnatura = D.vizitator && D.vizitator !== 'Coordonare' ? NL + NL + D.vizitator : '';
+    return 'Salut, ' + m.prenume + '! Îți trimit aplicația de Asimilare pentru ' +
+      (aLui ? 'echipa ta' : 'echipa ' + numeEchipa) + '. Din ea ceri confirmările în grup, ' +
+      'vezi cine vine și bifezi prezența.' + NL + NL +
+      'Următoarea slujire a echipei:' + NL + NL +
+      ziuaTintaIngrosata() + NL + NL +
+      '*Cum o instalezi — o singură dată:*' + NL + NL +
+      '*Android:* deschide linkul în Chrome → meniul ⋮ din dreapta sus → *Instalează aplicația*.' + NL + NL +
+      '*iPhone:* deschide linkul în Safari → apasă *Copiază linkul* → butonul de partajare → ' +
+      '*Adaugă la ecranul principal* → deschide aplicația de pe ecran și, dacă îți cere linkul, lipește-l.' + NL + NL +
+      'Linkul tău:' + NL + m.linkAdmin + NL + NL +
+      'E doar al tău: se leagă de telefonul pe care instalezi aplicația și nu mai merge ' +
+      'de pe altul, așa că nu-l da mai departe.' + semnatura;
+  }
+
+  /**
+   * De când e legat linkul, și dacă alt telefon a fost refuzat — numai pentru
+   * admini, care pot dezlega. Refuzul e semnalul: omul și-a schimbat telefonul
+   * sau a instalat pe iPhone după ce deschisese linkul în Safari.
+   */
+  function legareLink(m) {
+    if (!D.esteAdmin) return '';
+    if (!m.legatDin) {
+      return '<p class="nota">Încă nelegat — se leagă de telefonul pe care își instalează aplicația.</p>';
+    }
+    return '<p class="nota">Legat de un telefon din ' + esc(m.legatDin) + '.' +
+      (m.refuzatLa
+        ? ' <b>Alt telefon a fost refuzat pe ' + esc(m.refuzatLa) + '</b> — dacă și-a schimbat ' +
+          'telefonul sau a instalat aplicația pe iPhone, dezleagă-l și trimite-i din nou invitația.'
+        : '') + '</p>' +
+      '<div class="bulk"><button class="btn" data-act="dezleaga">Dezleagă de telefon</button></div>';
+  }
+
   function fisaMembru(id) {
     var m = byId(id);
     var tel = telIntl(m.telefon);
@@ -1311,13 +1425,11 @@
         '<div class="bulk"><button class="btn" data-copiaza="1">Copiază linkul</button>' +
         (m.telefon
           ? '<a class="btn" target="_blank" rel="noopener" href="https://wa.me/' + tel +
-            '?text=' + encodeURIComponent(
-              'Salut! Ăsta e linkul tău de coordonator pentru echipa ' + D.echipa.nume +
-              '. Deschide-l o dată de pe telefonul tău — de atunci rămâne legat de el ' +
-              'și nu mai merge de pe altul.' + NL + NL + m.linkAdmin) +
-            '">Trimite pe WhatsApp</a>'
+            '?text=' + encodeURIComponent(invitatieCoordonator(m)) +
+            '">Trimite invitația</a>'
           : '') +
-        '</div>'
+        '</div>' +
+        legareLink(m)
       : '';
 
     // Pe propria cartelă comutatorul e blocat: altfel te-ai putea încuia singur
@@ -1373,6 +1485,23 @@
         if (!b) return;
         var k = b.getAttribute('data-act');
         if (k === 'muta') { fisaMutare(m.id); return; }
+        if (k === 'dezleaga') {
+          if (b.getAttribute('data-armat') !== '1') {
+            b.setAttribute('data-armat', '1');
+            b.textContent = 'Sigur? Atinge din nou';
+            return;
+          }
+          b.disabled = true;
+          google.script.run
+            .withSuccessHandler(function (nou) {
+              aplica(nou); randeaza();
+              fisaMembru(m.id);
+              toast('Dezlegat — trimite-i din nou invitația');
+            })
+            .withFailureHandler(function () { toast('Nu s-a putut dezlega'); b.disabled = false; })
+            .dezleagaMembru(m.id, D.echipa.id);
+          return;
+        }
         var date = {
           id: m.id, nume: m.nume, telefon: m.telefon, email: m.email,
           departament: m.departament, rol: m.rol, familie: m.familie,
@@ -1976,29 +2105,95 @@
     p.hidden = false;
   }
 
+  /** „de azi, 08:12", „de ieri, 21:40", „din 10.09" */
+  function cand(t) {
+    var d = new Date(t), acum = new Date();
+    var doi = function (x) { return ('0' + x).slice(-2); };
+    var zi = function (x) { return new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(); };
+    var dif = Math.round((zi(acum) - zi(d)) / 86400000);
+    var ora = doi(d.getHours()) + ':' + doi(d.getMinutes());
+    if (dif <= 0) return 'de azi, ' + ora;
+    if (dif === 1) return 'de ieri, ' + ora;
+    return 'din ' + doi(d.getDate()) + '.' + doi(d.getMonth() + 1);
+  }
+
+  /**
+   * Fără link în memorie: îl poate lipi aici.
+   *
+   * Pe iPhone, aplicația de pe ecran pornește cu memoria goală — linkul
+   * deschis în Safari nu ajunge în ea. Căsuța asta e drumul lui.
+   */
+  function cereLinkul() {
+    poarta('Îți trebuie linkul tău',
+           'Lipește aici linkul primit de la coordonarea Asimilării. ' +
+           'Telefonul îl ține minte după aceea.', false);
+    document.getElementById('poartaLink').hidden = false;
+    var camp = document.getElementById('linkLipit');
+    document.getElementById('linkBtn').onclick = function () {
+      var t = String(camp.value || '').trim();
+      var m = t.match(/[?&]a=([A-Za-z0-9]+)/) || t.match(/^([A-Za-z0-9]{10,})$/);
+      if (!m) {
+        document.getElementById('poartaText').textContent =
+          'Nu seamănă cu linkul primit. Copiază-l din mesaj întreg și lipește-l din nou.';
+        return;
+      }
+      try { localStorage.setItem(CHEIE, m[1]); } catch (e) { /* mod privat */ }
+      _token = m[1];
+      document.getElementById('poartaLink').hidden = true;
+      porneste();
+    };
+  }
+
+  /** iPhone, în Safari sau în WhatsApp: doar pașii de instalare. */
+  function ecranInstalare() {
+    var t = tokenul();
+    poarta('Instalează aplicația',
+           t ? 'Pe iPhone, Asimilare merge instalată pe ecranul principal. Patru pași, o singură dată:'
+             : 'Deschide întâi linkul primit de la coordonarea Asimilării, apoi urmează pașii.',
+           false);
+    document.getElementById('poartaIos').hidden = false;
+    var b = document.getElementById('copiazaLink');
+    b.hidden = !t;
+    var link = location.origin + location.pathname + '?a=' + t;
+    b.onclick = function () {
+      var gata = function () { b.textContent = 'Copiat — acum partajare ↑'; };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(link).then(gata, function () { window.prompt('Copiază linkul:', link); });
+      } else {
+        window.prompt('Copiază linkul:', link);
+      }
+    };
+  }
+
   function porneste() {
-    if (!tokenul()) {
-      poarta('Îți trebuie linkul tău',
-             'Deschide o dată linkul primit de la coordonarea Asimilării. ' +
-             'Telefonul îl ține minte pe urmă, și aplicația se deschide direct.',
-             false);
-      return;
-    }
+    if (DOAR_INSTALARE) { ecranInstalare(); return; }
+    if (!tokenul()) { cereLinkul(); return; }
 
     // Dacă avem ce arăta, arătăm pe loc și verificăm în fundal.
     var vechi = ultimul();
     var dunga = document.getElementById('prospetire');
     if (vechi) {
-      D = vechi;
+      D = vechi.date;
       document.getElementById('poarta').hidden = true;
       randeaza();
+      dunga.textContent = 'Se actualizează · ce vezi e ' + cand(vechi.cand);
       dunga.hidden = false;
     } else {
       poarta('Se încarcă…', 'Aducem datele echipei.', false);
     }
 
-    cheama('stare', []).then(function (d) {
-      D = d;
+    // Reîncărcăm exact echipa din instantaneu, fără dată: serverul alege ziua
+    // de azi. Dacă între timp omul nu mai are voie la echipa aia, cerem ce i
+    // se cuvine acum.
+    var cerere = vechi
+      ? cheama('reincarca', [vechi.date.echipa.id, '']).catch(function (er) {
+          if (String(er.message || er).indexOf('Fără acces') >= 0) return cheama('stare', []);
+          throw er;
+        })
+      : cheama('stare', []);
+
+    cerere.then(function (d) {
+      if (vechi) aplica(d); else D = d;
       document.getElementById('poarta').hidden = true;
       dunga.hidden = true;
       randeaza();
@@ -2009,7 +2204,7 @@
       // Cu date vechi pe ecran, o eroare de rețea nu trebuie să le acopere:
       // ce se vede e mai bun decât nimic. Doar dacă linkul chiar nu mai merge
       // punem poarta peste tot.
-      if (vechi && !aparat) { toast('N-am putut împrospăta. Ce vezi e de mai devreme.'); return; }
+      if (vechi && !aparat) { toast('N-am putut împrospăta. Ce vezi e ' + cand(vechi.cand) + '.'); return; }
       poarta(aparat ? 'Linkul e legat de alt telefon' : 'N-am putut încărca',
              aparat ? mesaj
                     : (navigator.onLine ? mesaj

@@ -19,7 +19,7 @@
 // ele, GitHub Pages dă fișierele cu `max-age`, iar service worker-ul nou își
 // umple memoria cu pagina expirată — arată versiune nouă de service worker și
 // conținut vechi, ceea ce e mai rău decât să nu se fi actualizat deloc.
-var VERSIUNE = '0d22118d01cd';
+var VERSIUNE = '16911d513f32';
 var CACHE = 'asimilare-' + VERSIUNE;
 var COAJA = ['./', './index.html', './manifest.webmanifest', './icon.png'];
 
@@ -44,15 +44,35 @@ self.addEventListener('activate', function (e) {
   );
 });
 
-/** Pagina: rețeaua întâi, memoria doar dacă nu se poate. */
+function dinMemorie(cerere) {
+  return caches.match(cerere).then(function (r) { return r || caches.match('./index.html'); });
+}
+
+/**
+ * Pagina: rețeaua întâi — dar nu la nesfârșit.
+ *
+ * Dimineața, prima deschidere pe date mobile începe cu tot drumul: nume de
+ * domeniu, conexiune criptată. Pe semnal slab ține secunde, iar cât ține,
+ * ecranul e alb. Dacă rețeaua nu răspunde în două secunde și jumătate, servim
+ * coaja din memorie; pagina nouă ajunge oricum în memorie pentru data viitoare.
+ */
+var ASTEPTARE_RETEA = 2500;
+
 function retiaIntai(cerere) {
-  return fetch(new Request(cerere.url, { cache: 'no-cache' })).then(function (proaspat) {
+  var dinRetea = fetch(new Request(cerere.url, { cache: 'no-cache' })).then(function (proaspat) {
     var copie = proaspat.clone();
     caches.open(CACHE).then(function (c) { c.put(cerere, copie); });
     return proaspat;
-  }).catch(function () {
-    return caches.match(cerere).then(function (r) { return r || caches.match('./index.html'); });
   });
+
+  var dupaAsteptare = new Promise(function (gata) {
+    setTimeout(function () { dinMemorie(cerere).then(gata); }, ASTEPTARE_RETEA);
+  });
+
+  // Dacă memoria e goală (prima instalare), n-avem ce servi — așteptăm rețeaua.
+  return Promise.race([dinRetea, dupaAsteptare])
+    .then(function (r) { return r || dinRetea; })
+    .catch(function () { return dinMemorie(cerere); });
 }
 
 /** Restul cojii: din memorie, dar o împrospătăm în fundal pentru data viitoare. */
