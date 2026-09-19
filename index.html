@@ -859,6 +859,25 @@
         NL + D.echipa.coordonator;
     }
 
+    // Prima invitație a echipei prin aplicație: cu prezentarea sistemului.
+    if (cineva === 0 && primaInvitatie()) {
+      return 'Salut tuturor! De acum confirmăm slujirea la Asimilare printr-o aplicație ' +
+        'simplă, în loc de mesaje pe grup.' + NL + NL +
+        '*Cum confirmi — din două atingeri:*' + NL +
+        '1. Deschizi linkul de mai jos și îți atingi numele din listă.' + NL +
+        '2. Alegi *Vin* sau *Nu pot*. Dacă nu poți, tot acolo scrii cine te înlocuiește, ' +
+        'dacă ai găsit pe cineva.' + NL + NL +
+        '*Pentru familie:* dacă sunteți mai mulți din aceeași familie în echipă, e de ajuns ' +
+        'să confirme unul pentru toți — îi lasă bifați pe cei care vin.' + NL + NL +
+        'Alegerea numelui e doar acum, prima dată. Data viitoare când deschizi linkul, ' +
+        'telefonul te recunoaște și ajungi direct la întrebarea dacă vii sau nu.' + NL + NL +
+        'Dacă nu te găsești în listă, apasă *Nu sunt în listă* și scrie-ți numărul.' + NL + NL +
+        'E rândul echipei noastre:' + NL + NL +
+        ziuaIngrosata() + NL + NL +
+        'Confirmați aici:' + NL + D.linkGrup + NL + NL +
+        'Mulțumesc! ' + D.echipa.coordonator;
+    }
+
     // nimeni n-a răspuns încă, sau abia unul-doi: cererea inițială
     if (cineva === 0) {
       return 'Salut! E rândul echipei noastre:' + NL + NL +
@@ -884,6 +903,17 @@
       'Mulțumesc! ' + D.echipa.coordonator;
   }
 
+  /**
+   * Prima dată când echipa primește invitația prin aplicație: nimeni din echipă
+   * n-a confirmat încă la nicio slujire. După prima rundă, istoricul are
+   * confirmări și mesajul revine la forma scurtă, standard.
+   */
+  function primaInvitatie() {
+    return !D.membri.some(function (m) {
+      return (m.istoric && m.istoric.confirmate > 0) || m.raspuns === 'da' || m.raspuns === 'nu';
+    });
+  }
+
   function cardGrup() {
     if (!D.linkGrup) return '';
     var fara = deTrimis().filter(function (m) {
@@ -899,6 +929,10 @@
       '<div class="bulk"><button class="btn btn-primary" data-grup="copy">' +
         (fara === total ? 'Copiază mesajul pentru grup' : 'Copiază reminderul pentru grup') +
       '</button></div>' +
+      (fara === total && primaInvitatie()
+        ? '<p class="footnote" style="margin-top:0.7rem;padding-bottom:0"><b>Prima invitație a echipei:</b> ' +
+          'mesajul conține și o scurtă prezentare a aplicației. De data viitoare pleacă doar invitația obișnuită.</p>'
+        : '') +
       '<p class="footnote" style="margin-top:0.7rem;padding-bottom:0">' +
       'Îl lipești în grupul de WhatsApp al echipei. Fiecare își atinge numele în ' +
       'listă și confirmă — telefonul îl ține minte pentru duminicile următoare. ' +
@@ -996,12 +1030,16 @@
 
     var m = byId(ids[i]);
     var txt = mesaj(m, !!m.trimisLa);
+    // Un singur buton face tot: deschide WhatsApp cu mesajul gata scris și
+    // notează trimiterea. Înainte erau două („Deschide WhatsApp" + „Am trimis"),
+    // iar cine apăsa direct „Am trimis" nota un mesaj care nu plecase.
+    var urm = i + 1 < ids.length;
     var buton = D.config.MOD_TEST
       ? '<button class="btn btn-primary" data-copy="1">Copiază mesajul</button>'
       : (m.telefon
-          ? '<a class="contact" href="https://wa.me/' + telIntl(m.telefon) + '?text=' +
-            encodeURIComponent(txt) + '" target="_blank" rel="noopener"><b>Deschide WhatsApp</b>' +
-            '<span>' + esc(m.telefon) + '</span></a>'
+          ? '<a class="btn btn-primary" data-act="wa" href="https://wa.me/' + telIntl(m.telefon) + '?text=' +
+            encodeURIComponent(txt) + '" target="_blank" rel="noopener">Trimite pe WhatsApp · ' +
+            esc(m.telefon) + '</a>'
           : '<div class="contact"><b>Fără telefon</b><span>completează-l în Echipa</span></div>');
 
     deschide(
@@ -1010,10 +1048,13 @@
       '<button class="sheet-close" data-close="1">Oprește</button></div>' +
       '<div class="sheet-body">' +
       '<div class="progress" style="margin-bottom:0.9rem"><i data-k="yes" style="width:' + (i / ids.length * 100) + '%"></i></div>' +
-      buton +
+      '<div class="bulk">' + buton + '</div>' +
       '<div class="msg" id="msgText">' + esc(txt) + '</div>' +
-      '<div class="bulk"><button class="btn btn-primary" data-act="next">' +
-        (i + 1 < ids.length ? 'Am trimis · următorul' : 'Am trimis · gata') + '</button></div>' +
+      (D.config.MOD_TEST || !m.telefon
+        ? '<div class="bulk"><button class="btn' + (D.config.MOD_TEST ? '' : ' btn-primary') + '" data-act="next">' +
+          (urm ? 'Am trimis · următorul' : 'Am trimis · gata') + '</button></div>'
+        : '<p class="footnote" style="padding-bottom:0">Se deschide WhatsApp cu mesajul scris — apasă acolo ' +
+          '<b>Trimite</b>. Când revii aici, ' + (urm ? 'te așteaptă următorul.' : 'lista e gata.') + '</p>') +
       '<div class="bulk"><button class="btn" data-act="skip">Sari peste</button>' +
       '<button class="btn" data-act="verbal">Mi-a zis verbal că nu vine</button></div>' +
       (D.config.MOD_TEST
@@ -1030,6 +1071,18 @@
         if (!b) return;
         var k = b.getAttribute('data-act');
         if (k === 'skip') { serie(ids, i + 1); return; }
+        if (k === 'wa') {
+          // Lăsăm linkul să deschidă WhatsApp; notăm și trecem mai departe
+          // abia după, ca fișa să nu dispară înainte să plece linkul.
+          if (b.getAttribute('data-gata')) { ev.preventDefault(); return; }
+          b.setAttribute('data-gata', '1');
+          setTimeout(function () { marcheaza('next'); }, 400);
+          return;
+        }
+        marcheaza(k);
+      });
+
+    function marcheaza(k) {
         var fn = (k === 'verbal') ? 'noteazaVerbal' : 'noteazaTrimis';
         optimist([m.id],
           function () {
@@ -1041,7 +1094,7 @@
             google.script.run.withSuccessHandler(reusit).withFailureHandler(esuat)[fn](m.id, D.data, D.echipa.id);
           });
         serie(ids, i + 1);
-      });
+    }
   }
 
   // ── salvare optimistă ───────────────────────────────
