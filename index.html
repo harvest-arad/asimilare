@@ -408,6 +408,39 @@
 
   .toast[data-show="true"] { opacity: 1; }
 
+  /* Ecranele de coordonare (doar admini): start, program, echipe. Cât stă
+     omul pe ele, vederea de echipă (antet, taburi, panouri) nu se vede. */
+  body[data-vedere="acasa"] .masthead, body[data-vedere="acasa"] .mutari, body[data-vedere="acasa"] .shell,
+  body[data-vedere="program"] .masthead, body[data-vedere="program"] .mutari, body[data-vedere="program"] .shell,
+  body[data-vedere="echipe"] .masthead, body[data-vedere="echipe"] .mutari, body[data-vedere="echipe"] .shell { display: none; }
+
+  .admin { max-width: 34rem; margin: 0 auto; padding: 0 1.1rem 4rem; }
+  .admin-head { display: flex; align-items: center; gap: 0.7rem; padding: 1rem 0 0.3rem; }
+  .admin-head h1 {
+    font-family: var(--font-display); font-weight: 800; letter-spacing: -0.015em;
+    font-size: 1.32rem; line-height: 1.15; margin: 0;
+  }
+  .inapoi {
+    appearance: none; background: none; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 0.35rem 0.6rem; font-family: var(--font-display); font-weight: 700;
+    font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-soft); cursor: pointer; flex: 0 0 auto;
+  }
+  .inapoi:focus-visible, .usa:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  .masthead .inapoi { margin: 0 0 0.55rem; }
+
+  .usa {
+    appearance: none; display: block; width: 100%; text-align: left; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--gold);
+    border-radius: var(--radius); padding: 1.1rem 1rem; margin: 0 0 0.8rem; color: var(--ink);
+    font-family: inherit;
+  }
+  .usa b {
+    display: block; font-family: var(--font-display); font-weight: 800;
+    font-size: 1.05rem; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .usa span { display: block; font-size: 0.84rem; color: var(--ink-soft); margin-top: 0.2rem; }
+
   @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
   [hidden] { display: none !important; }
 </style>
@@ -423,8 +456,11 @@
   </div>
 </div>
 
+<div class="admin" id="admin" hidden></div>
+
 <header class="masthead">
   <div class="masthead-inner">
+    <button class="inapoi" id="inapoiStart" type="button" data-vezi="acasa" hidden>← Program și echipe</button>
     <button class="dayline" id="dayline" type="button"></button>
     <h1 class="title" id="titluZi">Confirmări</h1>
     <div class="progress" id="progress"></div>
@@ -433,7 +469,6 @@
       <button class="tab" data-p="sunday" aria-selected="false">Răspunsuri</button>
       <button class="tab" data-p="team" aria-selected="false">Echipa</button>
       <button class="tab" data-p="dates" aria-selected="false">Datele mele</button>
-      <button class="tab" data-p="program" aria-selected="false" id="tabProgram" hidden>Program</button>
     </div>
   </div>
 </header>
@@ -445,7 +480,6 @@
   <section class="panel" data-panel="sunday" hidden></section>
   <section class="panel" data-panel="team" hidden></section>
   <section class="panel" data-panel="dates" hidden></section>
-  <section class="panel" data-panel="program" hidden></section>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -1946,7 +1980,7 @@
   function incarcaProgram() {
     if (programIncarca) return;
     programIncarca = true; programEroare = '';
-    renderProgram();
+    randeazaAdmin();
     var ids = (D.echipe || []).map(function (e) { return e.id; });
     Promise.all(ids.map(function (id) {
       return stareEchipa(id).then(rezumaEchipa)
@@ -1958,16 +1992,111 @@
       // Echipa care n-a răspuns acum rămâne cu ce știam despre ea data trecută.
       var bune = lot.map(function (x) { return x.eroare ? vechi[x.id] : x; })
         .filter(function (x) { return x; });
-      if (!bune.length) { programEroare = 'Nu s-a putut încărca programul.'; renderProgram(); return; }
+      if (!bune.length) { programEroare = 'Nu s-a putut încărca programul.'; randeazaAdmin(); return; }
       if (lot.some(function (x) { return x.eroare; })) programEroare = 'Unele echipe n-au răspuns — încearcă din nou.';
       PROGRAM = { cand: Date.now(), echipe: bune };
       try { localStorage.setItem(CHEIE_PROGRAM, JSON.stringify(PROGRAM)); } catch (e) { /* fără memorie */ }
-      renderProgram();
+      randeazaAdmin();
     }).catch(function () {
       programIncarca = false;
       programEroare = 'Nu s-a putut încărca programul.';
-      renderProgram();
+      randeazaAdmin();
     });
+  }
+
+  // ── Ecranele de coordonare: start, program, echipe ──
+  //
+  // Adminii pornesc pe ecranul de start. De acolo: PROGRAM (doar programul) sau
+  // ECHIPE (alegi coordonatorul și intri în echipa lui). Coordonatorii obișnuiți
+  // nu văd nimic din toate astea — pentru ei VEDERE rămâne 'echipa'.
+
+  var VEDERE = null;   // 'acasa' | 'program' | 'echipe' | 'echipa'
+
+  function seteazaVedere(v) {
+    VEDERE = v;
+    document.body.setAttribute('data-vedere', v);
+    try { window.scrollTo(0, 0); } catch (e) { /* nimic */ }
+    randeazaAdmin();
+    if (v === 'program' || v === 'echipe') {
+      if (!PROGRAM) PROGRAM = citesteProgramTinut();
+      if (!PROGRAM || Date.now() - PROGRAM.cand > 10 * 60 * 1000) incarcaProgram();
+    }
+  }
+
+  function capAdmin(titlu, inapoi) {
+    return '<div class="admin-head">' +
+      (inapoi ? '<button class="inapoi" type="button" data-vezi="acasa">← Start</button>' : '') +
+      '<h1>' + esc(titlu) + '</h1></div>';
+  }
+
+  function coordonatoriEchipa(id) {
+    var e = ((PROGRAM && PROGRAM.echipe) || []).filter(function (x) { return x.id === id; })[0];
+    return e ? e : null;
+  }
+
+  function randeazaAdmin() {
+    var host = document.getElementById('admin');
+    var inapoi = document.getElementById('inapoiStart');
+    if (inapoi) inapoi.hidden = !(D && D.esteAdmin);
+    if (!host) return;
+    host.hidden = !(VEDERE === 'acasa' || VEDERE === 'program' || VEDERE === 'echipe');
+    if (host.hidden) return;
+
+    if (VEDERE === 'acasa') {
+      if (!PROGRAM) PROGRAM = citesteProgramTinut();
+      var urm = '';
+      if (PROGRAM) {
+        var toate = [];
+        PROGRAM.echipe.forEach(function (e) {
+          e.date.forEach(function (x) { if (x.data >= D.azi) toate.push({ x: x, e: e }); });
+        });
+        toate.sort(function (a, b) { return a.x.data < b.x.data ? -1 : 1; });
+        if (toate.length) urm = 'Următoarea: ' + ziuaProgram(toate[0].x) + ' — echipa ' + toate[0].e.nume;
+      }
+      host.innerHTML = capAdmin('Coordonare Asimilare', false) +
+        '<p class="lede" style="margin-top:0.4rem">' + esc(D.vizitator || '') + '</p>' +
+        '<button class="usa" type="button" data-vezi="program"><b>Program</b>' +
+          '<span>' + esc(urm || 'Cine slujește și cine coordonează în săptămânile următoare') + '</span></button>' +
+        '<button class="usa" type="button" data-vezi="echipe"><b>Echipe</b>' +
+          '<span>Alegi coordonatorul și intri în echipa lui: confirmări, răspunsuri, prezență</span></button>';
+      return;
+    }
+
+    if (VEDERE === 'program') {
+      host.innerHTML = capAdmin('Program', true) + '<div id="adminCorp"></div>';
+      renderProgram();
+      return;
+    }
+
+    // echipe
+    var h = capAdmin('Echipe', true) +
+      '<p class="lede" style="margin-top:0.4rem">Atinge un coordonator ca să intri în echipa lui.</p>' +
+      '<div class="card"><ul>';
+    (D.echipe || []).forEach(function (e) {
+      var info = coordonatoriEchipa(e.id);
+      var coord = info && info.coord.length
+        ? info.coord.map(function (c) { return c.nume; }).join(', ')
+        : (info && info.coordonator) || e.coordonator || '';
+      var urm = info && info.date.length ? 'următoarea: ' + info.date[0].text : '';
+      h += '<li><button class="prow-btn" data-intra="' + esc(e.id) + '">' +
+        '<span class="pbody"><span class="pname">' + esc(e.nume) + '</span>' +
+        '<span class="pnote">' + esc([coord, urm].filter(function (x) { return x; }).join(' · ') || e.grup || '') +
+        '</span></span>' +
+        (e.id === D.echipa.id ? '<span class="chip" data-k="yes">deschisă</span>' : '') +
+        '</button></li>';
+    });
+    h += '</ul></div>' +
+      (programIncarca && !PROGRAM ? '<p class="footnote">Se încarcă numele coordonatorilor…</p>' : '');
+    host.innerHTML = h;
+  }
+
+  function intraInEchipa(id, buton) {
+    if (id === D.echipa.id) { seteazaVedere('echipa'); randeaza(); return; }
+    if (buton) { buton.disabled = true; var n = buton.querySelector('.pnote'); if (n) n.textContent = 'Se deschide…'; }
+    google.script.run
+      .withSuccessHandler(function (nou) { aplica(nou); seteazaVedere('echipa'); randeaza(); })
+      .withFailureHandler(function () { if (buton) buton.disabled = false; toast('Nu s-a putut deschide echipa'); })
+      .schimba(D.token, id, '');
   }
 
   function ziuaProgram(x) {
@@ -1976,8 +2105,8 @@
   }
 
   function renderProgram() {
-    var host = document.querySelector('[data-panel="program"]');
-    if (!host || !D.esteAdmin) return;
+    var host = document.getElementById('adminCorp');
+    if (!host || VEDERE !== 'program' || !D.esteAdmin) return;
     if (!PROGRAM) PROGRAM = citesteProgramTinut();
 
     var h = '<p class="lede">Cine slujește și cine coordonează în săptămânile următoare, ' +
@@ -2067,7 +2196,7 @@
       (programIncarca ? 'Se actualizează…' : 'Actualizează') + '</button></div>' +
       '<p class="footnote">' + (programEroare ? esc(programEroare) + ' ' : '') +
       'Date ' + cand(PROGRAM.cand) + '. Programul vine din fila „Duminici", iar coordonatorii ' +
-      'sunt cei marcați „coordonator" în echipa lor. Tab-ul îl văd doar Valentin și Adi.</p>';
+      'sunt cei marcați „coordonator" în echipa lor. Pagina o văd doar Valentin și Adi.</p>';
     host.innerHTML = h;
   }
 
@@ -2281,6 +2410,12 @@
       return;
     }
 
+    var vz = ev.target.closest('[data-vezi]');
+    if (vz) { seteazaVedere(vz.getAttribute('data-vezi')); return; }
+
+    var ie = ev.target.closest('[data-intra]');
+    if (ie) { intraInEchipa(ie.getAttribute('data-intra'), ie); return; }
+
     var pb = ev.target.closest('[data-program]');
     if (pb) {
       var k = pb.getAttribute('data-program');
@@ -2289,7 +2424,7 @@
       return;
     }
 
-    if (ev.target.closest('[data-echipe]')) { fisaEchipe(); return; }
+    if (ev.target.closest('[data-echipe]')) { seteazaVedere('echipe'); return; }
     if (ev.target.closest('[data-schimb]')) { fisaSchimb(); return; }
 
     // Mutarea privirii pe altă zi de slujire, sau pe altă echipă.
@@ -2331,11 +2466,6 @@
       // Intri din nou în tab → pornești de unde e firesc pentru ziua de azi.
       // Comutatorul rămâne pentru ocolul de moment, nu ți-l ține minte la infinit.
       if (p === 'sunday') { modAles = null; renderSunday(); }
-      if (p === 'program') {
-        renderProgram();
-        // Proaspăt la fiecare intrare, dacă ultimul e mai vechi de 10 minute.
-        if (!PROGRAM || Date.now() - PROGRAM.cand > 10 * 60 * 1000) incarcaProgram();
-      }
     }
   });
 
@@ -2361,9 +2491,9 @@
 
     renderMutari();
     renderSend(); renderSunday(); renderTeam(); renderDates();
-    var tp = document.getElementById('tabProgram');
-    if (tp) tp.hidden = !D.esteAdmin;
-    renderProgram();
+    // Adminii pornesc pe ecranul de start; ceilalți direct în echipa lor.
+    if (VEDERE === null) seteazaVedere(D.esteAdmin ? 'acasa' : 'echipa');
+    else randeazaAdmin();
   }
 
   // ── pornirea ────────────────────────────────────────────
