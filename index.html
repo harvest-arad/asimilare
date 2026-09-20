@@ -441,6 +441,15 @@
   }
   .usa span { display: block; font-size: 0.84rem; color: var(--ink-soft); margin-top: 0.2rem; }
 
+  /* Ziua, în Program: se vede de la distanță, nu se pierde între echipe. */
+  .zi-bar {
+    background: var(--gold); color: var(--on-gold); border-radius: var(--radius);
+    padding: 0.5rem 0.75rem; margin: 1.7rem 0 0.5rem;
+    font-family: var(--font-display); font-weight: 800;
+    font-size: 1.15rem; line-height: 1.2; letter-spacing: 0.01em;
+  }
+  .zi-bar:first-of-type { margin-top: 1rem; }
+
   @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
   [hidden] { display: none !important; }
 </style>
@@ -2148,7 +2157,7 @@
 
     ordine.forEach(function (zi) {
       var lot = peZi[zi];
-      h += '<div class="section-head"><h2 class="section-title">' + esc(ziuaProgram(lot[0].x)) + '</h2></div>' +
+      h += '<h2 class="zi-bar">' + esc(ziuaProgram(lot[0].x)) + '</h2>' +
         '<div class="card"><ul>';
       lot.forEach(function (r) {
         var e = r.e;
