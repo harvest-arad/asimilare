@@ -653,7 +653,8 @@
       return { id: id, spre: spre, dep: dep, si: si ? 'true' : '', d: d, e: e };
     },
     inchideMutarea: function (rand, d, e) { return { rand: rand, d: d, e: e }; },
-    dezleagaMembru: function (id, e) { return { id: id, e: e }; }
+    dezleagaMembru: function (id, e) { return { id: id, e: e }; },
+    grupTrimis:     function (d, e) { return { d: d, e: e }; }
   };
 
   function cheama(metoda, argumente) {
@@ -983,7 +984,9 @@
       'listă și confirmă — telefonul îl ține minte pentru duminicile următoare. ' +
       'Cine nu se găsește în listă apasă „Nu sunt în listă", își scrie numărul, ' +
       'și de acolo ori e recunoscut la echipa unde s-a mutat, ori primește un ' +
-      'mesaj gata scris pentru tine, ca să-l treci în listă.</p>' +
+      'mesaj gata scris pentru tine, ca să-l treci în listă.<br><br>' +
+      'Cine nu răspunde primește din <b>miercuri</b> și un email de reamintire — ' +
+      'dar numai după ce ai copiat de aici mesajul pentru grup.</p>' +
       '</div></div>';
   }
 
@@ -2371,6 +2374,12 @@
           function () { toast('Copiat — lipește în grup'); },
           function () { toast('Nu am putut copia'); });
       } else { toast('Copierea nu merge aici'); }
+      // Serverul ține minte că invitația a plecat în grup: abia de acum pot
+      // pleca, din miercuri, emailurile către cei care n-au răspuns.
+      if (D.data === D.dataTinta) {
+        google.script.run.withSuccessHandler(function () {}).withFailureHandler(function () {})
+          .grupTrimis(D.data, D.echipa.id);
+      }
       return;
     }
 
