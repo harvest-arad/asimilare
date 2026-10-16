@@ -641,6 +641,9 @@
     noteazaTrimis:  function (id, d, e) { return { id: id, d: d, e: e }; },
     noteazaVerbal:  function (id, d, e) { return { id: id, d: d, e: e }; },
     comutaServiciu: function (id, d, e) { return { id: id, d: d, e: e }; },
+    seteazaServiciu: function (id, deServiciu, d, e) {
+      return { id: id, serviciu: deServiciu ? 'true' : 'false', d: d, e: e };
+    },
     noteazaPrezenta: function (id, prezent, d, e) {
       return { id: id, prezent: prezent, d: d, e: e };
     },
@@ -1154,6 +1157,17 @@
 
   var _inZbor = 0;
 
+  // Câte salvări au pornit de la deschiderea paginii. O reîncărcare plecată
+  // înainte de ultima salvare nu o conține, chiar dacă ajunge după ea.
+  var _pornite = 0;
+
+  // Datele sunt pentru ziua și echipa de pe ecran? Un răspuns pentru altele
+  // (omul a schimbat între timp ziua sau echipa) nu are ce căuta acolo.
+  function aceeasiVedere(d) {
+    if (!d || !d.echipa || !d.data) return true;   // nu putem spune: ca înainte
+    return d.data === D.data && d.echipa.id === D.echipa.id;
+  }
+
   /**
    * @param {Array}    ids       cine se schimbă — ca să știm ce dăm înapoi la eșec
    * @param {Function} schimba   modifică `D` pe loc
@@ -1165,27 +1179,77 @@
       var m = byId(id);
       if (m) copie[id] = JSON.parse(JSON.stringify(m));
     });
+    var zi = D.data, echipa = D.echipa.id;
 
     schimba();
     randeaza();
 
     _inZbor++;
+    _pornite++;
     porneste(
       function (nou) {
         _inZbor--;
-        // Un răspuns întârziat n-are voie să șteargă o atingere mai nouă.
-        if (_inZbor === 0 && nou) { aplica(nou); randeaza(); }
+        try {
+          // Un răspuns întârziat n-are voie să șteargă o atingere mai nouă.
+          if (_inZbor === 0 && nou && aceeasiVedere(nou)) { aplica(nou); randeaza(); }
+        } finally { golesteLiber(); }
       },
       function () {
         _inZbor--;
-        Object.keys(copie).forEach(function (id) {
-          var m = byId(id);
-          if (m) Object.keys(copie[id]).forEach(function (k) { m[k] = copie[id][k]; });
-        });
-        randeaza();
-        toast(mesajEroare || 'Nu s-a putut salva');
+        try {
+          // Dacă omul a trecut între timp pe altă zi sau echipă, `byId` ar găsi
+          // același om în alte date și i-am scrie peste ele copia de dinainte.
+          if (D.data === zi && D.echipa.id === echipa) {
+            Object.keys(copie).forEach(function (id) {
+              var m = byId(id);
+              if (m) Object.keys(copie[id]).forEach(function (k) { m[k] = copie[id][k]; });
+            });
+            randeaza();
+          }
+          toast(mesajEroare || 'Nu s-a putut salva');
+        } finally { golesteLiber(); }
       }
     );
+  }
+
+  // Ce trebuie să aștepte până nu mai e nicio salvare pe drum — de pildă o
+  // reîncărcare care, pusă acum, ar șterge de pe ecran atingeri încă nesalvate.
+  var _laLiber = [];
+
+  function candLiber(f) {
+    if (_inZbor === 0) f(); else _laLiber.push(f);
+  }
+
+  function golesteLiber() {
+    if (_inZbor !== 0) return;
+    var deRulat = _laLiber;
+    _laLiber = [];
+    deRulat.forEach(function (f) {
+      try { f(); } catch (e) { /* una stricată nu le oprește pe celelalte */ }
+    });
+  }
+
+  // Salvările cu aceeași cheie pleacă la server una după alta, nu deodată.
+  // Trimise în paralel pot ajunge în ordine inversă, iar la schimb (unde
+  // serverul comută și șterge rânduri) se pot încurca între ele; foaia ar
+  // rămâne altfel decât arată ecranul.
+  //
+  // `trimite(gata)` trebuie să cheme `gata` orice ar fi. Dacă aruncă înainte
+  // să plece cererea, chemăm `laEsec` și trecem mai departe: un lanț blocat ar
+  // opri pe tăcute toate salvările care vin după.
+  var _lant = {};
+
+  function inLant(cheie, trimite, laEsec) {
+    var ruleaza = function () {
+      return new Promise(function (gata) {
+        try { trimite(gata); }
+        catch (e) { try { laEsec(); } finally { gata(); } }
+      });
+    };
+    var urmeaza = (_lant[cheie] || Promise.resolve()).then(ruleaza, ruleaza);
+    _lant[cheie] = urmeaza;
+    urmeaza.then(function () { if (_lant[cheie] === urmeaza) delete _lant[cheie]; },
+                 function () { /* nimic de curățat */ });
   }
 
   // ── Duminică: răspunsuri până în ziua slujirii, prezență după ─────────
@@ -2417,14 +2481,17 @@
     var pz = ev.target.closest('[data-prez]');
     if (pz) {
       var id = pz.getAttribute('data-prez');
-      var m = byId(id);
-      var nou = !(m.prezent === false) ? false : true;
-      m.prezent = nou;
-      renderSunday();
-      google.script.run
-        .withSuccessHandler(function (d) { aplica(d); randeaza(); })
-        .withFailureHandler(function () { toast('Nu s-a putut salva'); })
-        .noteazaPrezenta(id, nou, D.data, D.echipa.id);
+      var nou = byId(id).prezent === false;
+      // Ziua și echipa de la atingere, nu de la plecarea cererii din lanț.
+      var ziP = D.data, echipaP = D.echipa.id;
+      optimist([id], function () { byId(id).prezent = nou; }, function (reusit, esuat) {
+        inLant('prez:' + id, function (gata) {
+          google.script.run
+            .withSuccessHandler(function (d) { try { reusit(d); } finally { gata(); } })
+            .withFailureHandler(function () { try { esuat(); } finally { gata(); } })
+            .noteazaPrezenta(id, nou, ziP, echipaP);
+        }, esuat);
+      });
       return;
     }
 
@@ -2462,14 +2529,32 @@
     var sv = ev.target.closest('[data-serv]');
     if (sv) {
       var idm = sv.getAttribute('data-serv');
-      var mm2 = byId(idm);
-      mm2.deServiciu = !mm2.deServiciu;
-      sv.setAttribute('data-absent', String(!mm2.deServiciu));
-      sv.querySelector('.mark').innerHTML = mm2.deServiciu ? TICK : CROSS;
-      google.script.run
-        .withSuccessHandler(function (nou) { aplica(nou); })
-        .withFailureHandler(function () { toast('Nu s-a putut salva'); })
-        .comutaServiciu(idm, D.data, D.echipa.id);
+      var ziS = D.data, echipaS = D.echipa.id;
+      // Rândul e în fișă, pe care randeaza() n-o atinge; îl redesenăm din `D`
+      // după orice schimbare, inclusiv după întoarcerea de la un eșec. Îl
+      // căutăm în fișa deschisă acum: dacă omul a închis-o și a redeschis-o
+      // între timp, rândul atins inițial nu mai e în pagină.
+      var marcheaza = function () {
+        var m = byId(idm);
+        var r = sheet && sheet.querySelector('[data-serv="' + idm + '"]');
+        if (!m || !r) return;
+        r.setAttribute('data-absent', String(!m.deServiciu));
+        r.querySelector('.mark').innerHTML = m.deServiciu ? TICK : CROSS;
+      };
+      // Trimitem ce arată ecranul după atingere, nu „comută": o cerere repetată
+      // sau al cărei răspuns s-a pierdut nu mai poate lăsa foaia invers.
+      var vrea = !byId(idm).deServiciu;
+      optimist([idm], function () { byId(idm).deServiciu = vrea; marcheaza(); },
+        function (reusit, esuat) {
+          // Pe om, ca la prezență: atingerile lui pleacă în ordine. Între oameni
+          // diferiți ordinea nu contează, serverul scrie sub lacăt.
+          inLant('serv:' + idm, function (gata) {
+            google.script.run
+              .withSuccessHandler(function (nou) { try { reusit(nou); marcheaza(); } finally { gata(); } })
+              .withFailureHandler(function () { try { esuat(); marcheaza(); } finally { gata(); } })
+              .seteazaServiciu(idm, vrea, ziS, echipaS);
+          }, esuat);
+        });
       return;
     }
 
@@ -2612,6 +2697,7 @@
     // Reîncărcăm exact echipa din instantaneu, fără dată: serverul alege ziua
     // de azi. Dacă între timp omul nu mai are voie la echipa aia, cerem ce i
     // se cuvine acum.
+    var g = _pornite;
     var cerere = vechi
       ? cheama('reincarca', [vechi.date.echipa.id, '']).catch(function (er) {
           if (String(er.message || er).indexOf('Fără acces') >= 0) return cheama('stare', []);
@@ -2620,10 +2706,9 @@
       : cheama('stare', []);
 
     cerere.then(function (d) {
-      if (vechi) aplica(d); else D = d;
       document.getElementById('poarta').hidden = true;
-      dunga.hidden = true;
-      randeaza();
+      if (vechi) aplicaProaspat(d, g, true);
+      else { dunga.hidden = true; D = d; randeaza(); }
     }, function (er) {
       dunga.hidden = true;
       var mesaj = String(er.message || er);
@@ -2642,6 +2727,39 @@
 
   document.getElementById('poartaBtn').onclick = porneste;
 
+  // Pornind din instantaneu, omul poate bifa înainte să vină datele noi. Un
+  // răspuns plecat înaintea bifelor nu le are și, pus pe ecran, le-ar șterge,
+  // chiar dacă ajunge după ce s-au salvat. Așa că îl punem doar dacă n-a mai
+  // pornit nicio salvare de când a plecat cererea (`g`) și nu e nimic pe drum;
+  // altfel cerem aceeași echipă și zi din nou, după ce s-au întors toate.
+  //
+  // Excepția e pornirea pe altă zi sau echipă decât instantaneul (de pildă
+  // instantaneul e de duminica trecută): bifele de pe drum sunt pentru ziua
+  // veche, deci n-avem ce șterge, iar omul trebuie mutat pe loc pe ziua bună,
+  // nu lăsat să bifeze mai departe pe cea trecută.
+  var _proaspatLaCoada = false;
+
+  function aplicaProaspat(d, g, laPornire) {
+    var dunga = document.getElementById('prospetire');
+    var aceeasi = aceeasiVedere(d);
+    if (!aceeasi && !laPornire) { dunga.hidden = true; return; }   // omul a schimbat ziua sau echipa
+    if (!aceeasi || (_inZbor === 0 && g === _pornite)) {
+      dunga.hidden = true;
+      aplica(d); randeaza();
+      return;
+    }
+    if (_proaspatLaCoada) return;                // o reîncărcare așteaptă deja
+    _proaspatLaCoada = true;
+    var echipa = d.echipa.id, zi = d.data;
+    candLiber(function () {
+      _proaspatLaCoada = false;
+      if (D.data !== zi || D.echipa.id !== echipa) { dunga.hidden = true; return; }
+      var g2 = _pornite;
+      cheama('reincarca', [echipa, zi]).then(function (d2) { aplicaProaspat(d2, g2, false); },
+        function () { dunga.hidden = true; /* rămâne ce e pe ecran */ });
+    });
+  }
+
   // Datele se învechesc cât stă aplicația deschisă în fundal — la revenire,
   // le luăm din nou. Altfel ai vedea confirmări de acum două ore. Dar nu la
   // fiecare clipire: dacă tocmai am cerut, lăsăm în pace.
@@ -2650,9 +2768,9 @@
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden && D && Date.now() - ultimaCerere > 60000) {
       ultimaCerere = Date.now();
-      cheama('reincarca', [D.echipa.id, D.data]).then(function (d) {
-        aplica(d); randeaza();
-      }, function () { /* tăcere: rămâne ce era pe ecran */ });
+      var g = _pornite;
+      cheama('reincarca', [D.echipa.id, D.data]).then(function (d) { aplicaProaspat(d, g, false); },
+        function () { /* tăcere: rămâne ce era pe ecran */ });
     }
   });
 
