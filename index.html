@@ -311,6 +311,8 @@
   .mutare b { display: block; font-weight: 600; font-size: 0.9rem; }
   .mutare small { display: block; color: var(--ink-mute); font-size: 0.74rem; line-height: 1.45; margin-top: 0.1rem; }
   .mutare .btn { margin-top: 0.5rem; }
+  .mutare .ora { display: block; font-size: 0.9rem; font-weight: 600; margin-top: 0.3rem; }
+  .mutare .ora i { font-style: normal; color: var(--ink-mute); font-weight: 400; }
 
   .mutare-x {
     flex: none; border: 0; background: none; cursor: pointer; padding: 0.1rem 0.25rem;
@@ -482,6 +484,7 @@
   </div>
 </header>
 
+<div class="mutari" id="programSpecial"></div>
 <div class="mutari" id="mutari"></div>
 
 <div class="shell">
@@ -769,6 +772,52 @@
   }
 
   /**
+   * Sărbătorile 2026–2027: zile cu alt program decât duminica obișnuită
+   * (anunțul lui Adi Zopota din 27.10, după discuția cu presbiterii).
+   *
+   * Cheia e data din foaie (AAAA-LL-ZZ). `servicii` sunt orele la care începe
+   * programul; `sosire` e ora unică la care vine toată echipa (o singură
+   * echipă slujește la toate serviciile): în mod normal cu o oră înainte de
+   * primul. Unde e `curatenie`, echipele vin cu 15–20 de minute mai devreme
+   * și își fac curățenie în zona de slujire, ca să nu fie chemate grupurile
+   * mici la curățenie a doua zi de Crăciun și de Anul Nou.
+   */
+  var ZILE_SPECIALE = {
+    '2026-12-25': { servicii: ['16:00', '18:00'], sosire: '15:00' },
+    '2026-12-27': { servicii: ['9:00', '11:30'], sosire: '7:40–7:45', curatenie: true },
+    '2027-01-01': { servicii: ['17:00'], sosire: '16:00' },
+    '2027-01-03': { servicii: ['9:00', '11:30'], sosire: '7:40–7:45', curatenie: true }
+  };
+
+  // Ce curăță fiecare, pe scurt. Doar în linii mari — nu ca într-o zi de sâmbătă.
+  var CURATENIE_SCURT = 'curățenie generală, în linii mari, a zonei de slujire ' +
+    '(fără aspirat, fără spălat geamuri)';
+  var CURATENIE_ZONE = 'Usierii — sala, accesul în clădire, holul, accesul în sală, coridoarele. ' +
+    'Cafe — zona de cafe. Info — zona de info. DAR — curățenie generală.';
+
+  function ziSpeciala() {
+    return ZILE_SPECIALE[String(D.data || '').slice(0, 10)] || null;
+  }
+
+  /**
+   * Programul zilei speciale, pentru mesajele de WhatsApp: orele serviciilor
+   * și ora de sosire, îngroșate. Gol într-o duminică obișnuită. `complet`
+   * adaugă și cine curăță ce — doar în invitație; în reminder ajunge rândul
+   * scurt, oamenii au primit deja lista.
+   */
+  function programZi(complet) {
+    var s = ziSpeciala();
+    if (!s) return '';
+    var t = '*Servicii la ' + s.servicii.join(' și ') + '*' + NL +
+      '*Sosire: ' + s.sosire + '*' + NL;
+    t += s.curatenie
+      ? 'Venim cu 15–20 de minute mai devreme decât de obicei, pentru ' + CURATENIE_SCURT + '.' +
+        (complet ? NL + CURATENIE_ZONE : '') + NL
+      : 'Sosirea e cu o oră înainte de începerea primului serviciu.' + NL;
+    return t + NL;
+  }
+
+  /**
    * Slujirea nu e totdeauna duminica: mai e Joia Mare, Vinerea Mare, Paștele,
    * Crăciunul, Anul Nou. Titlul ia numele zilei din date, nu îl presupune.
    */
@@ -824,7 +873,7 @@
   function mesaj(m, reminder) {
     if (reminder) {
       return 'Salut, ' + m.prenume + '! Revin cu rugămintea să-mi confirmi pentru' +
-        NL + NL + ziuaIngrosata() + NL + NL +
+        NL + NL + ziuaIngrosata() + NL + NL + programZi(false) +
         'E de ajuns o atingere:' + NL + m.link + NL + NL +
         'Mulțumesc! ' + D.echipa.coordonator;
     }
@@ -832,7 +881,7 @@
     var unde = m.departament.toLowerCase();
     if (m.rol && m.rol.toLowerCase() !== unde) unde += ' — ' + m.rol;
     return 'Salut, ' + m.prenume + '! Ești programat(ă) la ' + unde + ':' + NL + NL +
-      ziuaIngrosata() + NL + NL +
+      ziuaIngrosata() + NL + NL + programZi(true) +
       'Confirmă-mi te rog dacă vii, dintr-o atingere:' + NL + m.link + NL + NL +
       'Dacă nu poți, tot de acolo îmi spui și dacă ai găsit pe cineva să te înlocuiască. Mulțumesc! ' +
       D.echipa.coordonator;
@@ -922,7 +971,7 @@
         'telefonul te recunoaște și ajungi direct la întrebarea dacă vii sau nu.' + NL + NL +
         'Dacă nu te găsești în listă, apasă *Nu sunt în listă* și scrie-ți numărul.' + NL + NL +
         'E rândul echipei noastre:' + NL + NL +
-        ziuaIngrosata() + NL + NL +
+        ziuaIngrosata() + NL + NL + programZi(true) +
         'Confirmați aici:' + NL + D.linkGrup + NL + NL +
         'Mulțumesc! ' + D.echipa.coordonator;
     }
@@ -930,8 +979,8 @@
     // nimeni n-a răspuns încă, sau abia unul-doi: cererea inițială
     if (cineva === 0) {
       return 'Salut! E rândul echipei noastre:' + NL + NL +
-        ziuaIngrosata() + NL + NL +
-        'Confirmați-mi vă rog aici — vă atingeți numele în listă, atât:' +
+        ziuaIngrosata() + NL + NL + programZi(true) +
+        'Confirmați-mi vă rog aici — e o singură atingere, Vin sau Nu pot:' +
         NL + D.linkGrup + NL + NL +
         'Dacă nu puteți, tot de acolo îmi spuneți — și dacă ați găsit pe cineva ' +
         'să vă înlocuiască. Mulțumesc! ' + D.echipa.coordonator;
@@ -940,14 +989,14 @@
     // mulți restanți: nu-i înșirăm, ar fi un perete de nume
     if (fara.length > MAX_NUME) {
       return 'Am primit ' + cineva + ' confirmări din ' + total + ' pentru' + NL + NL +
-        ziuaIngrosata() + NL + NL +
+        ziuaIngrosata() + NL + NL + programZi(false) +
         'Dacă n-ai apucat încă, e o singură atingere:' +
         NL + D.linkGrup + NL + NL + 'Mulțumesc! ' + D.echipa.coordonator;
     }
 
     // puțini: îi numim, e mai eficient
     return 'Mai aștept răspuns de la ' + listaNume(fara) + ' pentru' + NL + NL +
-      ziuaIngrosata() + NL + NL +
+      ziuaIngrosata() + NL + NL + programZi(false) +
       'E o singură atingere:' + NL + D.linkGrup + NL + NL +
       'Mulțumesc! ' + D.echipa.coordonator;
   }
@@ -1899,6 +1948,33 @@
     }).join('');
   }
 
+  /**
+   * Anunțul zilelor cu program aparte (Crăciun, Anul Nou și duminicile de
+   * după). Stă sub antet cât timp te uiți la ziua respectivă și nu se închide:
+   * orele nu sunt ceva ce vrei să dispară din greșeală cu o atingere.
+   */
+  /** Rândul cu orele, pentru lista „Datele mele": coordonatorul le vede din timp. */
+  function oreSpeciale(data) {
+    var s = ZILE_SPECIALE[String(data || '').slice(0, 10)];
+    if (!s) return '';
+    return '<span class="pnote"><b>Servicii la ' + esc(s.servicii.join(' și ')) + '</b>' +
+      ' · sosire ' + esc(s.sosire) + (s.curatenie ? ' (cu curățenie)' : '') + '</span>';
+  }
+
+  function renderProgramSpecial() {
+    var host = document.getElementById('programSpecial');
+    var s = ziSpeciala();
+    if (!s) { host.innerHTML = ''; return; }
+    var h = '<div class="mutare"><div><b>Program special — ' + esc(ziuaText()) + '</b>';
+    h += '<span class="ora">Servicii la ' + esc(s.servicii.join(' și ')) + '</span>' +
+      '<span class="ora">Sosire: ' + esc(s.sosire) + '</span>';
+    h += '<small>' + (s.curatenie
+      ? 'Echipele vin cu 15–20 de minute mai devreme decât de obicei, pentru ' + CURATENIE_SCURT +
+        '. ' + esc(CURATENIE_ZONE) + ' Așa nu mai chemăm grupurile mici la curățenie.'
+      : 'Echipele vin cu o oră înainte de începerea primului serviciu.') + '</small>';
+    host.innerHTML = h + '</div></div>';
+  }
+
   document.getElementById('mutari').addEventListener('click', function (ev) {
     var b = ev.target.closest('[data-mutare]');
     if (!b) return;
@@ -1973,7 +2049,8 @@
           '<span class="pbody"><span class="pname">' + esc(x.text) +
           (x.eveniment ? ' — ' + esc(x.eveniment) : '') + '</span>' +
           '<span class="pnote">' + (tinta ? 'se cer confirmările acum' :
-            acum ? 'te uiți la ea' : 'atinge ca să te uiți la ea') + '</span></span>' +
+            acum ? 'te uiți la ea' : 'atinge ca să te uiți la ea') + '</span>' +
+          oreSpeciale(x.data) + '</span>' +
           (acum ? '<span class="chip" data-k="yes">deschisă</span>' :
            tinta ? '<span class="chip" data-k="wait">următoarea</span>' : '') +
           '</button></li>';
@@ -2592,6 +2669,7 @@
       '<i data-k="covered" style="width:' + (c.covered / t * 100) + '%"></i>' +
       '<i data-k="gap" style="width:' + (c.gap / t * 100) + '%"></i>';
 
+    renderProgramSpecial();
     renderMutari();
     renderSend(); renderSunday(); renderTeam(); renderDates();
     // Adminii pornesc pe ecranul de start; ceilalți direct în echipa lor.
